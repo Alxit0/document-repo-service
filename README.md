@@ -3,7 +3,7 @@
 # sio_2425_project
 
 # Group members
-- A
-- B
-- C
+- Bernardo Borges (103592)
+- Alexandre Regalado (124562)
+- António Moreira (93279)
 
