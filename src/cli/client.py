@@ -104,7 +104,8 @@ def save_on_exit(result, **kwargs):
 
 @main.command()
 @click.argument('passphrase', required=True, type=str)
-def rep_subject_credentials(passphrase: str):
+@click.argument('cred_file', required=True, type=str)
+def rep_subject_credentials(passphrase: str, cred_file: str):
     """Generate a new RSA key pair and encrypt the private key."""
 
     # Paths for saving keys
@@ -115,27 +116,40 @@ def rep_subject_credentials(passphrase: str):
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
-        backend=default_backend()
+        backend=default_backend()   
     )
     public_key = private_key.public_key()
 
     # save public key
     with open(public_key_path, "wb") as pub_file:
-        pub_file.write(public_key.public_bytes(
+        public_key_bytes = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
+        )
+        pub_file.write(public_key_bytes)
     logger.info(f"Public key saved to {public_key_path}")
 
     # save encrypted private key
     encryption_algorithm = serialization.BestAvailableEncryption(passphrase.encode())
     with open(private_key_path, "wb") as priv_file:
-        priv_file.write(private_key.private_bytes(
+        private_key_bytes = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=encryption_algorithm
-        ))
+        )
+        priv_file.write(private_key_bytes)
     logger.info(f"Private key saved to {private_key_path} (encrypted)")
+
+    # save both keys to given file path
+    keys_obj = {
+        'REP_PUB_KEY': public_key_bytes.decode(),
+        'REP_PRIV_KEY': private_key_bytes.decode()
+    }
+    state.update(keys_obj)
+
+    with open(cred_file, "+w") as file:
+        json.dump(keys_obj, file, indent=4)
+
 
 if __name__ == '__main__':
     main()
