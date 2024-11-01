@@ -1,18 +1,25 @@
 import os
-import sys
 import logging
 import json
+import sys
 import click
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 logging.basicConfig(format='%(levelname)s\t- %(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# teatcher functions
+# Global state dictionary
+sate = None
+
 def load_state():
     state = {}
     state_dir = os.path.join(os.path.expanduser('~'), '.sio')
     state_file = os.path.join(state_dir, 'state.json')
+
+    os.makedirs(state_dir, exist_ok=True)
 
     logger.debug('State folder: ' + state_dir)
     logger.debug('State file: ' + state_file)
@@ -72,19 +79,63 @@ def save(state):
     with open(state_file, 'w') as f:
         f.write(json.dumps(state, indent=4))
 
+    logger.info('State saved successfully.')
+    logger.debug(state)
 
-@click.command()
+
+@click.group(invoke_without_command=True)
 @click.option('-k', '--key', type=click.Path(exists=True, dir_okay=False), help="Path to the key file")
 @click.option('-r', '--repo', help="Address:Port of the repository")
 @click.option('-v', '--verbose', is_flag=True, help="Increase verbosity")
+@click.help_option('-h', '--help')
 def main(key, repo, verbose):
+    global state
+
     # Load initial state
     state = load_state()
     state = parse_env(state)
     state = parse_args(state, key, repo, verbose)
-    
-    # Save the updated state
+
+@main.result_callback()
+def save_on_exit(result, **kwargs):
+    """Save the state after all commands have been processed."""
     save(state)
+
+
+@main.command()
+@click.argument('passphrase', required=True, type=str)
+def rep_subject_credentials(passphrase: str):
+    """Generate a new RSA key pair and encrypt the private key."""
+
+    # Paths for saving keys
+    private_key_path = os.path.join(os.path.expanduser('~'), '.sio', 'private_key.pem')
+    public_key_path = os.path.join(os.path.expanduser('~'), '.sio', 'public_key.pem')
+    
+    # gen RSA key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+
+    # save public key
+    with open(public_key_path, "wb") as pub_file:
+        pub_file.write(public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+    logger.info(f"Public key saved to {public_key_path}")
+
+    # save encrypted private key
+    encryption_algorithm = serialization.BestAvailableEncryption(passphrase.encode())
+    with open(private_key_path, "wb") as priv_file:
+        priv_file.write(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=encryption_algorithm
+        ))
+    logger.info(f"Private key saved to {private_key_path} (encrypted)")
 
 if __name__ == '__main__':
     main()
