@@ -1,9 +1,8 @@
 import os
 import sys
-import argparse
 import logging
 import json
-import requests
+import click
 
 logging.basicConfig(format='%(levelname)s\t- %(message)s')
 logger = logging.getLogger()
@@ -31,7 +30,7 @@ def load_state():
 def parse_env(state):
     if 'REP_ADDRESS' in os.environ:
         state['REP_ADDRESS'] = os.getenv('REP_ADDRESS')
-        logger.debug('Setting REP_ADDRESS from Environment to: ' + state['REP_ADDRESS'])
+        logger.debug(f'Setting REP_ADDRESS from Environment to: {state["REP_ADDRESS"]}')
 
     if 'REP_PUB_KEY' in os.environ:
         rep_pub_key = os.getenv('REP_PUB_KEY')
@@ -42,51 +41,49 @@ def parse_env(state):
                 logger.debug('Loaded REP_PUB_KEY from Environment')
     return state
 
-def parse_args(state):
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("-k", '--key', nargs=1, help="Path to the key file")
-    parser.add_argument("-r", '--repo', nargs=1, help="Address:Port of the repository")
-    parser.add_argument("-v", '--verbose', help="Increase verbosity", action="store_true")
-
-    args = parser.parse_args()
-    if args.verbose:
+def parse_args(state, key, repo, verbose):
+    if verbose:
         logger.setLevel(logging.DEBUG)
         logger.info('Setting log level to DEBUG')
 
-    if args.key:
-        if not os.path.exists(args.key[0]) or not os.path.isfile(args.key[0]):
-            logger.error(f'Key file not found or invalid: {args.key[0]}')
+    if key:
+        if not os.path.exists(key) or not os.path.isfile(key):
+            logger.error(f'Key file not found or invalid: {key}')
             sys.exit(-1)
         
-        with open(args.key[0], 'r') as f:
+        with open(key, 'r') as f:
             state['REP_PUB_KEY'] = f.read()
             logger.info('Overriding REP_PUB_KEY from command line')
 
-    if args.repo:
-        state['REP_ADDRESS'] = args.repo[0]
+    if repo:
+        state['REP_ADDRESS'] = repo
         logger.info('Overriding REP_ADDRESS from command line')
-        
+    
+    return state
+
 def save(state):
     state_dir = os.path.join(os.path.expanduser('~'), '.sio')
     state_file = os.path.join(state_dir, 'state.json')
 
     if not os.path.exists(state_dir):
-      logger.debug('Creating state folder')
-      os.mkdir(state_dir)
+        logger.debug('Creating state folder')
+        os.mkdir(state_dir)
 
     with open(state_file, 'w') as f:
         f.write(json.dumps(state, indent=4))
 
 
-def main():
+@click.command()
+@click.option('-k', '--key', type=click.Path(exists=True, dir_okay=False), help="Path to the key file")
+@click.option('-r', '--repo', help="Address:Port of the repository")
+@click.option('-v', '--verbose', is_flag=True, help="Increase verbosity")
+def main(key, repo, verbose):
+    # Load initial state
     state = load_state()
-    parse_env(state)
-    parse_args(state)
-
-    """ Do something """
-    req = requests.get(f'http://{state['REP_ADDRESS']}/organization/list')
-    print(req.json())
+    state = parse_env(state)
+    state = parse_args(state, key, repo, verbose)
+    
+    # Save the updated state
     save(state)
 
 if __name__ == '__main__':
