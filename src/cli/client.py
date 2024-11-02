@@ -6,6 +6,7 @@ import click
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+import requests
 
 logging.basicConfig(format='%(levelname)s\t- %(message)s')
 logger = logging.getLogger()
@@ -102,10 +103,11 @@ def save_on_exit(result, **kwargs):
     save(state)
 
 
+# standalone commands
 @main.command()
-@click.argument('passphrase', required=True, type=str)
+@click.argument('password', required=True, type=str)
 @click.argument('cred_file', required=True, type=str)
-def rep_subject_credentials(passphrase: str, cred_file: str):
+def rep_subject_credentials(password: str, cred_file: str):
     """Generate a new RSA key pair and encrypt the private key."""
 
     # Paths for saving keys
@@ -130,7 +132,7 @@ def rep_subject_credentials(passphrase: str, cred_file: str):
     logger.info(f"Public key saved to {public_key_path}")
 
     # save encrypted private key
-    encryption_algorithm = serialization.BestAvailableEncryption(passphrase.encode())
+    encryption_algorithm = serialization.BestAvailableEncryption(password.encode())
     with open(private_key_path, "wb") as priv_file:
         private_key_bytes = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -150,6 +152,31 @@ def rep_subject_credentials(passphrase: str, cred_file: str):
     with open(cred_file, "+w") as file:
         json.dump(keys_obj, file, indent=4)
 
+
+# anonymous API commands
+@main.command()
+@click.argument('organization', required=True, type=str)
+@click.argument('username', required=True, type=str)
+@click.argument('name', required=True, type=str)
+@click.argument('email', required=True, type=str)
+@click.argument('pub_key_file', required=True, type=click.Path(exists=True, dir_okay=False))
+def rep_create_org(organization: str, username: str, name: str, email: str, pub_key_file: str):
+    
+    # read public key
+    with open(pub_key_file, 'r') as file:
+        public_key = file.read()
+    
+    body = {
+        "organization": organization,
+        "username": username,
+        "name": name,
+        "email": email,
+        "public_key": public_key
+    }
+
+    res = requests.post(f'http://{state['REP_ADDRESS']}/organization/create', json=body)
+    logger.debug(res)
+    logger.info(res.content.decode())
 
 if __name__ == '__main__':
     main()
