@@ -178,5 +178,22 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     logger.debug(res)
     logger.info(res.content.decode())
 
+@main.command()
+def rep_list_orgs():
+
+    res = requests.get(f'http://{state['REP_ADDRESS']}/organization/list')
+
+    # check status of api call    
+    logger.debug(res)
+    if res.status_code != 200:
+        print(json.loads(res.content))
+        return
+
+    # display info
+    print(f"{'Org name':<20} | {'Creator'}")
+    print("-"*40)
+    for org in json.loads(res.content)['organizations']:
+        print(f"{org['organization_name']:<20} | {org['creator_username']}")
+
 if __name__ == '__main__':
     main()
