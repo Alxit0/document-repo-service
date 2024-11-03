@@ -32,3 +32,25 @@ python client.py [OPTIONS] rep_subject_credentials <password> <credentials file>
   - Location: `~/.sio/private_key.pem`
   - Format: PEM (encrypted)
   - Description: This file contains the private part of the RSA key pair, encrypted using the provided password. It should be kept secure and private.
+
+## Command: `rep_create_org`
+
+The `rep_create_org` command is used to create a new organization in the system by providing details about the organization, user, and public key file. This command requires several arguments to be provided, including organization details, user information, and the path to a public key file.
+
+### Usage
+
+```bash
+python client.py [OPTIONS] rep_create_org <organization> <username> <name> <email> <pub_key_file>
+```
+
+### Parameters
+
+- `organization` (required): The name of the organization you wish to create.
+- `username` (required): The username of the person creating the organization.
+- `name` (required): The full name of the person creating the organization.
+- `email` (required): The email address of the person creating the organization.
+- `pub_key_file` (required): Path to a file containing the public key for the organization. This file must exist, and it must be a file (not a directory).
+
+### Notes
+- Ensure that the public key file exists and is specified correctly as a file path.
+- The command will log the response from the server.
