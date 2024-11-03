@@ -61,7 +61,7 @@ The `rep_list_orgs` command retrieves and displays a list of organizations curre
 
 ### Usage
 ```bash
-rep_list_orgs
+python client.py [OPTIONS] rep_list_orgs
 ```
 This command does not require any arguments.
 
