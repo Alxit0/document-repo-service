@@ -13,7 +13,37 @@ with app.app_context():
 # endpoints
 @app.route("/organization/list")
 def org_list():
-    return json.dumps({"status": "not implemented"})
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute(
+            """
+            SELECT
+                organizations.name AS organization_name,
+                subjects.username AS creator_username
+            FROM
+                organizations
+            JOIN
+                subjects ON organizations.created_by = subjects.id;"""
+        )
+        
+        organizations = cur.fetchall()
+
+        org_list = [
+            {"organization_name": org[0], "creator_username": org[1]}
+            for org in organizations
+        ]
+
+        return jsonify({"status": "success", "organizations": org_list})
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
 
 @app.route("/organization/create", methods=['POST'])
 def org_create():
