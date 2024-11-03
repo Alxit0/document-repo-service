@@ -54,3 +54,27 @@ python client.py [OPTIONS] rep_create_org <organization> <username> <name> <emai
 ### Notes
 - Ensure that the public key file exists and is specified correctly as a file path.
 - The command will log the response from the server.
+
+
+## Command: `rep_list_orgs`
+The `rep_list_orgs` command retrieves and displays a list of organizations currently registered in the system. The command sends a request to an API endpoint and displays each organization's name along with the username of the creator.
+
+### Usage
+```bash
+rep_list_orgs
+```
+This command does not require any arguments.
+
+When run, this command will output a table that shows the list of organizations and their respective creators. The format of the output is as follows:
+
+
+```
+Org name             | Creator
+----------------------------------------
+ExampleOrg           | creator_username
+AnotherOrg           | another_creator
+```
+
+### Notes
+The command will log the API response for debugging purposes.
+If the API call is unsuccessful (i.e., it does not return a 200 status code), the command will print the error message from the server and terminate without displaying the table.
