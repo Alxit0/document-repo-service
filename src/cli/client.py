@@ -206,7 +206,8 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
     
     # Load the encrypted private key from a file (assume it's stored as PEM format)
     with open(cred_file, "rb") as key_file:
-        encrypted_private_key_bytes = key_file.read()
+        data = json.load(key_file)
+    encrypted_private_key_bytes = data['REP_PRIV_KEY'].encode()
     
     # Encode the encrypted private key as base64 to send over the network
     encrypted_private_key_b64 = base64.b64encode(encrypted_private_key_bytes).decode('utf-8')
