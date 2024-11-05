@@ -1,9 +1,10 @@
 import base64
+from functools import wraps
 from flask import Flask, jsonify, request
 import json
 
 from database import initialize_db, close_db, get_db
-from costum_auth import verify_client_identity, write_token
+from costum_auth import verify_client_identity, verify_token, write_token
 
 app = Flask(__name__)
 
@@ -11,6 +12,32 @@ app = Flask(__name__)
 app.teardown_appcontext(close_db)
 with app.app_context():
     initialize_db()
+
+# utils
+def verify_session():
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # get payload from request
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No JSON payload found"}), 400
+            
+            # extract session token
+            token = data['session']
+            if not token:
+                return jsonify({"error": "Session token is missing"}), 401
+            
+            # validate the token
+            if not verify_token(token):
+                return jsonify({"error": "Invalid session token"}), 403
+            
+            return func(*args, **kwargs)
+        
+        return wrapper
+    
+    return decorator
+
 
 # endpoints
 @app.route("/organization/list")
