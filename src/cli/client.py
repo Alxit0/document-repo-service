@@ -1,3 +1,4 @@
+import base64
 import os
 import logging
 import json
@@ -194,6 +195,42 @@ def rep_list_orgs():
     print("-"*40)
     for org in json.loads(res.content)['organizations']:
         print(f"{org['organization_name']:<20} | {org['creator_username']}")
+
+@main.command()
+@click.argument('organization', required=True, type=str)
+@click.argument('username', required=True, type=str)
+@click.argument('password', required=True, type=str)
+@click.argument('cred_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('session_file', required=True, type=click.Path(dir_okay=False))
+def rep_create_session(organization: str, username: str, password: str, cred_file: str, session_file: str):
+    
+    # Load the encrypted private key from a file (assume it's stored as PEM format)
+    with open(cred_file, "rb") as key_file:
+        data = json.load(key_file)
+    encrypted_private_key_bytes = data['REP_PRIV_KEY'].encode()
+    
+    # Encode the encrypted private key as base64 to send over the network
+    encrypted_private_key_b64 = base64.b64encode(encrypted_private_key_bytes).decode('utf-8')
+
+    # Create the payload for the POST request
+    payload = {
+        "organization": organization,
+        "username": username,
+        "password": password,
+        "encrypted_private_key": encrypted_private_key_b64
+    }
+
+    res = requests.post(f'http://{state['REP_ADDRESS']}/session/create', json=payload)
+    logger.debug(res)
+    logger.info(res.content.decode())
+    
+    if res.status_code != 200:
+        return
+    
+    data = json.loads(res.content)
+
+    with open(session_file, "+w") as file:
+        file.write(data['session_token'])
 
 if __name__ == '__main__':
     main()

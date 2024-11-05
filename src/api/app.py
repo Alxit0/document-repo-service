@@ -1,7 +1,10 @@
+import base64
+from functools import wraps
 from flask import Flask, jsonify, request
 import json
 
 from database import initialize_db, close_db, get_db
+from costum_auth import verify_client_identity, verify_token, write_token
 
 app = Flask(__name__)
 
@@ -9,6 +12,32 @@ app = Flask(__name__)
 app.teardown_appcontext(close_db)
 with app.app_context():
     initialize_db()
+
+# utils
+def verify_session():
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # get payload from request
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No JSON payload found"}), 400
+            
+            # extract session token
+            token = data['session']
+            if not token:
+                return jsonify({"error": "Session token is missing"}), 401
+            
+            # validate the token
+            if not verify_token(token):
+                return jsonify({"error": "Invalid session token"}), 403
+            
+            return func(*args, **kwargs)
+        
+        return wrapper
+    
+    return decorator
+
 
 # endpoints
 @app.route("/organization/list")
@@ -94,6 +123,68 @@ def org_create():
     finally:
         cur.close()
 
+
+@app.route("/session/create", methods=['POST'])
+def authenticate():
+    """
+    Endpoint to verify client's identity.
+    Expected JSON payload:
+    {
+        "organization": "organization_name"
+        "username": "client_username",
+        "password": "client_password",
+        "encrypted_private_key": "base64_encoded_encrypted_private_key"
+    }
+    """
+    data = request.json
+    cur = get_db().cursor()
+    
+    # Validate required fields
+    required_fields = ['organization', 'username', 'password', 'encrypted_private_key']
+    needed_fields = []
+    for field in required_fields:
+        if field not in data:
+            needed_fields.append(field)
+    
+    if needed_fields:
+        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
+    
+    # data parsing
+    username = data["username"]
+    password = data["password"]
+    encrypted_private_key_b64 = data["encrypted_private_key"]
+    organization_name = data["organization"]
+    
+    # Decode the base64-encoded encrypted private key
+    try:
+        encrypted_private_key_bytes = base64.b64decode(encrypted_private_key_b64)
+    except base64.binascii.Error:
+        return jsonify({"error": "Invalid base64 encoding for private key"}), 400
+    
+    # Retrieve the stored public key for the username
+    cur.execute("SELECT public_key FROM subjects WHERE username == ?", (username,))
+    stored_public_key_bytes:str = cur.fetchone()
+    
+    if stored_public_key_bytes is None:
+        return jsonify({"error": "User not found"}), 404
+
+    stored_public_key_bytes = stored_public_key_bytes[0]
+
+
+    # Verify the identity
+    is_verified = verify_client_identity(password, encrypted_private_key_bytes, stored_public_key_bytes.encode())
+
+    # Get organization
+    cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
+    org_id = cur.fetchmany()
+    if not org_id:
+        return jsonify({"error": "Organization not found"}), 404
+
+    # Return result
+    if is_verified:
+        return jsonify({"message": "Authentication successful", "session_token": write_token({"id": 1})}), 200
+    
+    return jsonify({"message": "Authentication failed. Incorrect password or private key."}), 401
 
 @app.route("/ping")
 def ping():
