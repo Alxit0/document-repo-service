@@ -1,10 +1,11 @@
 import base64
 from functools import wraps
+from pprint import pprint
 from flask import Flask, jsonify, request
 import json
 
 from database import initialize_db, close_db, get_db
-from costum_auth import verify_client_identity, verify_token, write_token
+from costum_auth import verify_client_identity, verify_token, write_token, extrat_token_info
 
 app = Flask(__name__)
 
@@ -162,29 +163,99 @@ def authenticate():
         return jsonify({"error": "Invalid base64 encoding for private key"}), 400
     
     # Retrieve the stored public key for the username
-    cur.execute("SELECT public_key FROM subjects WHERE username == ?", (username,))
-    stored_public_key_bytes:str = cur.fetchone()
+    cur.execute("SELECT public_key, id FROM subjects WHERE username == ?", (username,))
+    res:str = cur.fetchone()
     
-    if stored_public_key_bytes is None:
+    if res is None:
         return jsonify({"error": "User not found"}), 404
 
-    stored_public_key_bytes = stored_public_key_bytes[0]
+    stored_public_key_bytes = res[0]
+    user_id = res[1]
 
 
     # Verify the identity
     is_verified = verify_client_identity(password, encrypted_private_key_bytes, stored_public_key_bytes.encode())
 
+    if not is_verified:
+        return jsonify({"message": "Authentication failed. Incorrect password or private key."}), 401
+
     # Get organization
     cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
-    org_id = cur.fetchmany()
+    org_id = cur.fetchone()
     if not org_id:
         return jsonify({"error": "Organization not found"}), 404
+    org_id = org_id[0]
 
     # Return result
-    if is_verified:
-        return jsonify({"message": "Authentication successful", "session_token": write_token({"id": 1})}), 200
+    token_info = {
+        'org': org_id,
+        'usr': user_id
+    }
+    print(token_info)
+    return jsonify({"message": "Authentication successful", "session_token": write_token(token_info)}), 200
+
+
+@app.route("/file/upload", methods=['POST'])
+@verify_session()
+def upload_file():
+    data = request.get_json()
+
+    # Required fields in the JSON payload
+    required_fields = ["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"]    
+    needed_fields = []
+    for field in required_fields:
+        if field not in data:
+            needed_fields.append(field)
     
-    return jsonify({"message": "Authentication failed. Incorrect password or private key."}), 401
+    if needed_fields:
+        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
+
+    # parse JSON
+    encrypted_file = data["encrypted_file"]
+    document_name = data["name"]
+    file_handle = data["file_handle"]
+    
+    alg = data["algorithm"]
+    encrypted_key = data["encryption_key"]
+    iv = data["iv"]
+    nonce = data["nonce"]
+    
+    # Session data
+    ses_data = extrat_token_info(data['session'])
+    org_id = ses_data['org']
+    usr_id = ses_data['usr']
+
+    # insert document into the db
+    con = get_db()
+    cur = con.cursor()
+
+    try:
+        cur.execute(
+            """
+            INSERT INTO documents (handle, content, organization_id, created_by)
+            VALUES (?, ?, ?, ?)
+            """,
+            (file_handle, encrypted_file, org_id, usr_id)
+        )
+        doc_id = cur.lastrowid
+
+        cur.execute(
+            """
+            INSERT INTO document_metadata (document_id, encryption_key, alg, iv, nonce)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (doc_id, encrypted_key, alg, iv, nonce)
+        )
+
+        con.commit()
+    except Exception as e:
+        con.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+    return jsonify({"status": "Document uploaded successfully", "document_id": doc_id}), 200
+
 
 @app.route("/ping")
 def ping():
