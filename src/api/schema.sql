@@ -17,6 +17,7 @@ CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     handle TEXT NOT NULL UNIQUE,   -- identifier for the document
+    name TEXT NOT NULL,
     content BLOB,                  -- binary data for file storage, if needed for Delivery 1
     
     organization_id INTEGER,
@@ -28,8 +29,7 @@ CREATE TABLE documents (
 );
 
 CREATE TABLE document_metadata (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id INTEGER NOT NULL,
+    document_id INTEGER PRIMARY KEY,
     
     encryption_key TEXT NOT NULL,
     alg TEXT NOT NULL,

@@ -232,10 +232,10 @@ def upload_file():
     try:
         cur.execute(
             """
-            INSERT INTO documents (handle, content, organization_id, created_by)
+            INSERT INTO documents (handle, name, content, organization_id, created_by)
             VALUES (?, ?, ?, ?)
             """,
-            (file_handle, encrypted_file, org_id, usr_id)
+            (file_handle, document_name, encrypted_file, org_id, usr_id)
         )
         doc_id = cur.lastrowid
 
