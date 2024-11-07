@@ -11,4 +11,30 @@ CREATE TABLE subjects (
     email TEXT NOT NULL UNIQUE,
     full_name TEXT,
     public_key TEXT
-)
+);
+
+CREATE TABLE documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    handle TEXT NOT NULL UNIQUE,   -- identifier for the document
+    name TEXT NOT NULL,
+    content BLOB,                  -- binary data for file storage, if needed for Delivery 1
+    
+    organization_id INTEGER,
+    created_by INTEGER,            -- subject id of creator
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id),
+    FOREIGN KEY (created_by) REFERENCES subjects(id)
+);
+
+CREATE TABLE document_metadata (
+    document_id INTEGER PRIMARY KEY,
+    
+    encryption_key TEXT NOT NULL,
+    alg TEXT NOT NULL,
+    iv TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+
+    FOREIGN KEY (document_id) REFERENCES documents(id)
+);

@@ -78,3 +78,21 @@ AnotherOrg           | another_creator
 ### Notes
 The command will log the API response for debugging purposes.
 If the API call is unsuccessful (i.e., it does not return a 200 status code), the command will print the error message from the server and terminate without displaying the table.
+
+## Command: `rep_add_doc`
+The `rep_add_doc` command encrypts and uploads a document to the system, using a session file to authenticate the upload. The document is encrypted with a randomly selected encryption algorithm and mode before being sent to the server.
+
+### Usage
+```bash
+python client.py [OPTIONS] rep_add_doc <session_file> <document_name> <file>
+```
+The command will read the session token, encrypt the specified document, and upload the encrypted data to the server.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token used for authentication. This file must exist.
+- `document_name` (required): The name of the document to be uploaded.
+- `file` (required): Path to the document file that will be encrypted and uploaded. This file must exist.
+
+### Notes
+- Ensure that both the session file and document file paths are valid and exist.
+- The encryption algorithm and mode are randomly selected from a list of valid combinations

@@ -1,13 +1,19 @@
 import base64
+import hashlib
 import os
 import logging
 import json
+import random
+import secrets
 import sys
 import click
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 import requests
+
+from utils import encrypt_file, VALID_ALGOS_MODES_COMBOS
 
 logging.basicConfig(format='%(levelname)s\t- %(message)s')
 logger = logging.getLogger()
@@ -231,6 +237,57 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
 
     with open(session_file, "+w") as file:
         file.write(data['session_token'])
+
+
+@main.command()
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('document_name', required=True, type=str)
+@click.argument('file', required=True, type=click.Path(exists=True, dir_okay=False))
+def rep_add_doc(session_file: str, document_name: str, file: str):
+
+    # Extract session
+    with open(session_file, 'r') as f:
+        session = f.read()
+
+    # encrypt file
+    algo, mode = random.choice(VALID_ALGOS_MODES_COMBOS)
+    
+    encrypted_file_data, key, iv, nonce = encrypt_file(file, algo, mode)
+
+    # gen digest for file handle
+    with open(file, 'rb') as f:
+        file_handle = hashlib.sha256(f.read()).hexdigest()
+
+    # Encode encrypted file and IV for JSON compatibility
+    encrypted_file_b64 = base64.b64encode(encrypted_file_data).decode('utf-8')
+    iv_b64 = base64.b64encode(iv).decode('utf-8')
+    key_b64 = base64.b64encode(key).decode('utf-8')
+    nonce_b64 = base64.b64encode(nonce).decode('utf-8')
+
+    # Prepare request data
+    data = {
+        "session": session,
+        "encrypted_file": encrypted_file_b64,
+        "name": document_name,
+        "file_handle": file_handle,
+        
+        "iv": iv_b64,
+        "encryption_key": key_b64,
+        "nonce": nonce_b64,
+        "algorithm": f"{algo}-{mode}",
+    }
+
+    # Send the request to upload the encrypted file
+    response = requests.post(
+        f"http://{state['REP_ADDRESS']}/file/upload",
+        json=data
+    )
+
+    # Check response
+    if response.status_code == 200:
+        print("Document uploaded successfully.")
+    else:
+        print("Failed to upload document:", response.text)
 
 if __name__ == '__main__':
     main()
