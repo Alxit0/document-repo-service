@@ -1,12 +1,11 @@
 import base64
 from functools import wraps
 import os
-from pprint import pprint
 from flask import Flask, jsonify, request
 import json
 
 from database import initialize_db, close_db, get_db
-from costum_auth import verify_client_identity, verify_token, write_token, extrat_token_info, verify_signature
+from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
 
@@ -18,6 +17,28 @@ with app.app_context():
     initialize_db()
 
 # utils
+def verify_args(required_fields):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # get data
+            data = request.args if request.method == 'GET' else request.get_json()
+            
+            # Validate required fields
+            needed_fields = []
+            for field in required_fields:
+                if field not in data:
+                    needed_fields.append(field)
+            
+            if needed_fields:
+                return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
+            
+            return func(*args, **kwargs)
+        
+        return wrapper
+    
+    return decorator
+
 def verify_session():
     def decorator(func):
         @wraps(func)
@@ -79,23 +100,13 @@ def org_list():
 
 
 @app.route("/organization/create", methods=['POST'])
+@verify_args(['organization', 'username', 'name', 'email', 'public_key'])
 def org_create():
     db = get_db()
     cur = db.cursor()
 
-    data = request.get_json()
-
-    # Validate required fields
-    required_fields = ['organization', 'username', 'name', 'email', 'public_key']
-    needed_fields = []
-    for field in required_fields:
-        if field not in data:
-            needed_fields.append(field)
-    
-    if needed_fields:
-        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
-
     # data parsing
+    data = request.get_json()
     organization = data['organization']
     username = data['username']
     name = data['name']
@@ -129,17 +140,10 @@ def org_create():
 
 
 @app.route("/session/challenge")
+@verify_args(['username'])
 def challenge():
-    # Validate required fields
+
     data = request.args
-    required_fields = ['username']
-    needed_fields = []
-    for field in required_fields:
-        if field not in data:
-            needed_fields.append(field)
-    
-    if needed_fields:
-        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
 
     # check if is already generated
     if data['username'] in challenges:
@@ -152,6 +156,7 @@ def challenge():
     return json.dumps({"nounce": base64.b64encode(nonce).decode('utf-8')})
 
 @app.route("/session/create", methods=['POST'])
+@verify_args(['organization', 'username', 'signature'])
 def authenticate():
     """
     Endpoint to verify client's identity.
@@ -165,16 +170,6 @@ def authenticate():
     """
     data = request.json
     cur = get_db().cursor()
-    
-    # Validate required fields
-    required_fields = ['organization', 'username', 'signature']
-    needed_fields = []
-    for field in required_fields:
-        if field not in data:
-            needed_fields.append(field)
-    
-    if needed_fields:
-        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
     
     # data parsing
     username: str = data["username"]
@@ -220,18 +215,10 @@ def authenticate():
 
 @app.route("/file/upload", methods=['POST'])
 @verify_session()
+@verify_args(["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
-    data = request.get_json()
 
-    # Required fields in the JSON payload
-    required_fields = ["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"]    
-    needed_fields = []
-    for field in required_fields:
-        if field not in data:
-            needed_fields.append(field)
-    
-    if needed_fields:
-        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
+    data = request.get_json()
 
     # parse JSON
     encrypted_file = data["encrypted_file"]
