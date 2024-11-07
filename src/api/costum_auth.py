@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from jwt import encode, decode, exceptions
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidKey
 
@@ -43,6 +44,24 @@ def verify_client_identity(password: str, encrypted_private_key_bytes: bytes, st
     except InvalidKey:
         return False
 
+def verify_signature(public_key_pem, nonce, signature):
+    # Load the public key
+    public_key = serialization.load_pem_public_key(public_key_pem)
+
+    # Verify the signature
+    try:
+        public_key.verify(
+            signature,
+            nonce,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True  # Signature is valid
+    except Exception as e:
+        return False  # Signature is invalid
 
 # JWTokens related functions
 def write_token(data: dict) -> str:

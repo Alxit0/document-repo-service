@@ -6,9 +6,11 @@ from flask import Flask, jsonify, request
 import json
 
 from database import initialize_db, close_db, get_db
-from costum_auth import verify_client_identity, verify_token, write_token, extrat_token_info
+from costum_auth import verify_client_identity, verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
+
+challenges = {}
 
 # database setup
 app.teardown_appcontext(close_db)
@@ -139,8 +141,13 @@ def challenge():
     if needed_fields:
         return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
 
+    # check if is already generated
+    if data['username'] in challenges:
+        return json.dumps({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')})
+
     # gen nonce
     nonce = data['username'].encode() + os.urandom(16)
+    challenges[data['username']] = nonce
     
     return json.dumps({"nounce": base64.b64encode(nonce).decode('utf-8')})
 
@@ -160,7 +167,7 @@ def authenticate():
     cur = get_db().cursor()
     
     # Validate required fields
-    required_fields = ['organization', 'username', 'password', 'encrypted_private_key']
+    required_fields = ['organization', 'username', 'signature']
     needed_fields = []
     for field in required_fields:
         if field not in data:
@@ -170,16 +177,9 @@ def authenticate():
         return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
     
     # data parsing
-    username = data["username"]
-    password = data["password"]
-    encrypted_private_key_b64 = data["encrypted_private_key"]
-    organization_name = data["organization"]
-    
-    # Decode the base64-encoded encrypted private key
-    try:
-        encrypted_private_key_bytes = base64.b64decode(encrypted_private_key_b64)
-    except base64.binascii.Error:
-        return jsonify({"error": "Invalid base64 encoding for private key"}), 400
+    username: str = data["username"]
+    organization_name: str = data["organization"]
+    signature: str = data["signature"]
     
     # Retrieve the stored public key for the username
     cur.execute("SELECT public_key, id FROM subjects WHERE username == ?", (username,))
@@ -193,8 +193,12 @@ def authenticate():
 
 
     # Verify the identity
-    is_verified = verify_client_identity(password, encrypted_private_key_bytes, stored_public_key_bytes.encode())
-
+    is_verified = verify_signature(
+        stored_public_key_bytes.encode(),
+        challenges[username],
+        base64.b64decode(signature.encode())
+    )
+    
     if not is_verified:
         return jsonify({"message": "Authentication failed. Incorrect password or private key."}), 401
 
