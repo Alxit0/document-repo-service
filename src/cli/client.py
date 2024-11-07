@@ -7,9 +7,9 @@ import random
 import secrets
 import sys
 import click
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 import requests
 
@@ -210,6 +210,61 @@ def rep_list_orgs():
 @click.argument('session_file', required=True, type=click.Path(dir_okay=False))
 def rep_create_session(organization: str, username: str, password: str, cred_file: str, session_file: str):
     
+    # get challenge
+    params = {"username": username}
+    res = requests.get(f'http://{state['REP_ADDRESS']}/session/challenge', params=params)
+
+    logger.debug(res)
+    if res.status_code != 200:
+        logger.info(json.loads(res.content))
+        return
+
+    nonce = json.loads(res.content)['nounce']
+
+    # Load and decrypt the private key
+    with open(cred_file, 'r') as file:
+        keys = json.load(file)
+    
+    try:
+        private_key = serialization.load_pem_private_key(
+            keys['REP_PRIV_KEY'].encode('utf-8'),
+            password=password.encode()
+        )
+    except ValueError:
+        logger.info("Wrong password.")
+        return
+
+    # sign the nonce
+    signature = private_key.sign(
+        base64.b64decode(nonce),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+    # get session thorugh challenge
+    payload = {
+        "organization": organization,
+        "username": username,
+        "password": password,
+        "signature": base64.b64encode(signature).decode()
+    }
+
+    res = requests.post(f'http://{state['REP_ADDRESS']}/session/create', json=payload)
+    logger.debug(res)
+    logger.info(res.content.decode())
+    
+    if res.status_code != 200:
+        return
+    
+    data = json.loads(res.content)
+
+    with open(session_file, "+w") as file:
+        file.write(data['session_token'])
+
+    return
     # Load the encrypted private key from a file (assume it's stored as PEM format)
     with open(cred_file, "rb") as key_file:
         data = json.load(key_file)
