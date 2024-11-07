@@ -1,5 +1,6 @@
 import base64
 from functools import wraps
+import os
 from pprint import pprint
 from flask import Flask, jsonify, request
 import json
@@ -124,6 +125,24 @@ def org_create():
     finally:
         cur.close()
 
+
+@app.route("/session/challenge")
+def challenge():
+    # Validate required fields
+    data = request.args
+    required_fields = ['username']
+    needed_fields = []
+    for field in required_fields:
+        if field not in data:
+            needed_fields.append(field)
+    
+    if needed_fields:
+        return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
+
+    # gen nonce
+    nonce = data['username'].encode() + os.urandom(16)
+    
+    return json.dumps({"nounce": base64.b64encode(nonce).decode('utf-8')})
 
 @app.route("/session/create", methods=['POST'])
 def authenticate():
