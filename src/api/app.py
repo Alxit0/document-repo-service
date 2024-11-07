@@ -233,7 +233,7 @@ def upload_file():
         cur.execute(
             """
             INSERT INTO documents (handle, name, content, organization_id, created_by)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (file_handle, document_name, encrypted_file, org_id, usr_id)
         )
