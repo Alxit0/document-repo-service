@@ -292,8 +292,11 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
     nonce_b64 = base64.b64encode(nonce).decode('utf-8')
 
     # Prepare request data
+    headers = {
+        "session": session
+    }
+
     data = {
-        "session": session,
         "encrypted_file": encrypted_file_b64,
         "name": document_name,
         "file_handle": file_handle,
@@ -307,7 +310,8 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
     # Send the request to upload the encrypted file
     response = requests.post(
         f"http://{state['REP_ADDRESS']}/file/upload",
-        json=data
+        json=data,
+        headers=headers
     )
 
     # Check response

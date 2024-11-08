@@ -44,7 +44,7 @@ def verify_session():
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get payload from request
-            data = request.get_json()
+            data = request.headers
             if not data:
                 return jsonify({"error": "No JSON payload found"}), 400
             
@@ -231,7 +231,7 @@ def upload_file():
     nonce = data["nonce"]
     
     # Session data
-    ses_data = extrat_token_info(data['session'])
+    ses_data = extrat_token_info(request.headers['session'])
     org_id = ses_data['org']
     usr_id = ses_data['usr']
 
