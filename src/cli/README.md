@@ -96,3 +96,26 @@ The command will read the session token, encrypt the specified document, and upl
 ### Notes
 - Ensure that both the session file and document file paths are valid and exist.
 - The encryption algorithm and mode are randomly selected from a list of valid combinations
+
+## Command: `rep_list_docs`
+The `rep_list_docs` command retrieves a list of documents, with options to filter results by username and/or date. Authentication is handled through a session file containing a session token.
+
+### Usage
+'python client.py [OPTIONS] rep_list_docs <session_file>'
+
+This command reads the session token from the provided session file and retrieves document information from the server. Optional filters include username and date.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token used for authentication. This file must exist and contain a valid session token.
+- `username` (optional): Username to filter the document list. Only documents associated with this username will be shown.
+- `date` (optional): A date filter to narrow down results by specific date criteria. Specify the date in two parts:
+  - Filter type: Use one of the following:
+    - `'nt'` - Show documents on or after the specified date
+    - `'ot'` - Show documents on or before the specified date
+    - `'et'` - Show documents from exactly the specified date
+  - Date value: Format the date as `'YYYY-MM-DD'`
+
+### Notes
+- If the `date` option is used, ensure the format follows `[nt|ot|et] YYYY-MM-DD`.
+- Invalid date formats or unsupported filter types will return an error message.
+- The command communicates with the server endpoint `http://localhost:5000/file/list`, passing the session token in the request header and applying any specified filters.
