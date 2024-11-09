@@ -1,8 +1,10 @@
 import base64
+from datetime import datetime
 import hashlib
 import os
 import logging
 import json
+from pprint import pprint
 import random
 import secrets
 import sys
@@ -319,6 +321,57 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
         print("Document uploaded successfully.")
     else:
         print("Failed to upload document:", response.text)
+
+@main.command()
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option('-s', '--username', default='', help="Filter by username")
+@click.option('-d', '--date', nargs=2, type=str, help="Date filter with type and date. Format: '[nt|ot|et] YYYY-MM-DD'")
+def rep_list_docs(session_file, username, date):
+    """
+    Command to list documents. SESSION_FILE is the path to the session file containing the session token.
+    Optionally, filter by USERNAME and DATE with type ('nt', 'ot', or 'et').
+    """
+
+    # Read the session token from the session file
+    with open(session_file, 'r') as f:
+        session_token = f.read()
+
+
+    # Parse and validate the date filter
+    date_filter_type = None
+    filter_date = None
+    if date:
+        date_filter_type, filter_date = date
+        if date_filter_type not in ['nt', 'ot', 'et']:
+            logger.info("Invalid date filter type. Use 'nt' for on or after, 'ot' for on or before, or 'et' for exactly on.")
+            return
+        
+        try:
+            # Ensure date is in the correct format
+            datetime.strptime(filter_date, "%Y-%m-%d")
+        except ValueError:
+            logger.info("Invalid date format. Use YYYY-MM-DD.")
+            return
+
+    # Prepare the request headers and parameters
+    headers = {
+        'session': session_token
+    }
+    params = {
+        'username': username,
+        'date': filter_date,
+        'date_filter_type': date_filter_type
+    }
+
+    # Send request to the list_docs endpoint
+    response = requests.get("http://localhost:5000/file/list", headers=headers, params=params)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.info(f"Error: {response_data.get('error')}, Message: {response_data.get('message')}")
+        return
+
+    pprint(response_data['documents'])
 
 if __name__ == '__main__':
     main()
