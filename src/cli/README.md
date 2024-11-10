@@ -13,7 +13,7 @@ This command creates a new RSA private and public key pair, saving the public ke
 ### Usage
 
 ```bash
-python client.py [OPTIONS] rep_subject_credentials <password> <credentials file>
+rep_subject_credentials [OPTIONS]  <password> <credentials file>
 ```
 
 ### Parameters

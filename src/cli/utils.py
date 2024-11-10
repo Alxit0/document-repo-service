@@ -1,91 +1,106 @@
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding
-
+from functools import wraps
+import json
+import logging
 import os
+import sys
 
-ALGOS = {
-    'AES': lambda x,y: algorithms.AES(x),
-    'ChaCha20': lambda x,y: algorithms.ChaCha20(x, y),
-    'AES128': lambda x,y: algorithms.AES128(x),
-    'AES256': lambda x,y: algorithms.AES256(x),
-    'Camellia': lambda x,y: algorithms.Camellia(x),
-    '': lambda x,y: None,
-}
+import click
 
-MODES = {
-    "CBC": lambda x: modes.CBC(x),
-    "OFB": lambda x: modes.OFB(x),
-    "CFB": lambda x: modes.CFB(x),
-    "ECB": lambda x: modes.ECB(),
-    '': lambda x: None,
-}
+logging.basicConfig(format='%(levelname)s\t- %(message)s')
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-VALID_ALGOS_MODES_COMBOS = [
-    ('AES', 'CBC'),
-    ('AES', 'OFB'),
-    ('AES', 'CFB'),
-    ('AES', 'ECB'),
-    ('ChaCha20', ''),
-    ('AES256', 'CBC'),
-    ('AES256', 'OFB'),
-    ('AES256', 'CFB'),
-    ('AES256', 'ECB'),
-    ('Camellia', 'CBC'),
-    ('Camellia', 'OFB'),
-    ('Camellia', 'CFB'),
-    ('Camellia', 'ECB')
-]
+# Global state dictionary
+state = None
 
+def load_state():
+    state = {}
+    state_dir = os.path.join(os.path.expanduser('~'), '.sio')
+    state_file = os.path.join(state_dir, 'state.json')
 
-def encrypt_file(file_path: str, algo='AES', mode='CBC'):
-    # gen values
-    key = os.urandom(32)
-    iv = os.urandom(16)
-    nonce = os.urandom(16)
+    os.makedirs(state_dir, exist_ok=True)
 
-    # read file
-    with open(file_path, "rb") as file:
-        text = file.read()
-
-    # padding
-    padder =  padding.PKCS7(128).padder()
-    text = padder.update(text)
-    text += padder.finalize()
-
-    # encrypt
-    cipher = Cipher(ALGOS[algo](key,nonce), MODES[mode](iv))
-    encryptor = cipher.encryptor()
-    ct = encryptor.update(text) + encryptor.finalize()
-
-    return ct, key, iv, nonce
-
-
-def decrypt_file(key, iv, nonce, file_path: str, algo='AES', mode='CBC'):
+    logger.debug('State folder: ' + state_dir)
+    logger.debug('State file: ' + state_file)
     
+    if os.path.exists(state_file):
+        logger.debug('Loading state')
+        with open(state_file,'r') as f:
+            state = json.loads(f.read())
 
-    with open(file_path, "rb") as file:
-        ct = file.read()
+    if state is None:
+        state = {}
+
+    return state
+
+def parse_env(state):
+    if 'REP_ADDRESS' in os.environ:
+        state['REP_ADDRESS'] = os.getenv('REP_ADDRESS')
+        logger.debug(f'Setting REP_ADDRESS from Environment to: {state["REP_ADDRESS"]}')
+
+    if 'REP_PUB_KEY' in os.environ:
+        rep_pub_key = os.getenv('REP_PUB_KEY')
+        logger.debug('Loading REP_PUB_KEY fron: ' + state['REP_PUB_KEY'])
+        if os.path.exists(rep_pub_key):
+            with open(rep_pub_key, 'r') as f:
+                state['REP_PUB_KEY'] = f.read()
+                logger.debug('Loaded REP_PUB_KEY from Environment')
+    return state
+
+def parse_args(state, key, repo, verbose):
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        logger.info('Setting log level to DEBUG')
+
+    if key:
+        if not os.path.exists(key) or not os.path.isfile(key):
+            logger.error(f'Key file not found or invalid: {key}')
+            sys.exit(-1)
+        
+        with open(key, 'r') as f:
+            state['REP_PUB_KEY'] = f.read()
+            logger.info('Overriding REP_PUB_KEY from command line')
+
+    if repo:
+        state['REP_ADDRESS'] = repo
+        logger.info('Overriding REP_ADDRESS from command line')
     
-    # decrypt
-    cipher = Cipher(ALGOS[algo](key,nonce), MODES[mode](iv))
-    decryptor = cipher.decryptor()
-    text = decryptor.update(ct) + decryptor.finalize()
+    return state
 
-    # unpadd
-    unpadder =  padding.PKCS7(128).unpadder()
-    data = unpadder.update(text)
-    data += unpadder.finalize()
+def save(state):
+    state_dir = os.path.join(os.path.expanduser('~'), '.sio')
+    state_file = os.path.join(state_dir, 'state.json')
 
-def main():
-    """To generate all the valid combinations of algo/modes"""
-    
-    for i in ALGOS:
-        for j in MODES:
-            try:
-                encrypt_file('./README.md', i, j)
-                print((i, j))
-            except:
-                pass
+    if not os.path.exists(state_dir):
+        logger.debug('Creating state folder')
+        os.mkdir(state_dir)
 
-if __name__ == '__main__':
-    main()
+    with open(state_file, 'w') as f:
+        f.write(json.dumps(state, indent=4))
+
+    logger.info('State saved successfully.')
+    logger.debug(state)
+
+
+def default_command(func):
+    @click.command()
+    @click.option('-k', '--key', type=click.Path(exists=True, dir_okay=False), help="Path to the key file")
+    @click.option('-r', '--repo', help="Address:Port of the repository")
+    @click.option('-v', '--verbose', is_flag=True, help="Increase verbosity")
+    @click.help_option('-h', '--help')
+    @wraps(func)
+    def wrapper(key, repo, verbose, *args, **kwargs):
+        global state
+
+        # Load initial state
+        state = load_state()
+        state = parse_env(state)
+        state = parse_args(state, key, repo, verbose)
+        
+        # Call the original function
+        resp = func(*args, **kwargs)
+
+        save(state)
+        return resp
+            
+    return wrapper

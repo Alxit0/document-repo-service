@@ -13,14 +13,14 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 import requests
 
-from utils import encrypt_file, VALID_ALGOS_MODES_COMBOS
+from file_encryption import encrypt_file, VALID_ALGOS_MODES_COMBOS
 
 logging.basicConfig(format='%(levelname)s\t- %(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Global state dictionary
-sate = None
+state = None
 
 def load_state():
     state = {}
