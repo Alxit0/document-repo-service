@@ -40,7 +40,7 @@ The `rep_create_org` command is used to create a new organization in the system 
 ### Usage
 
 ```bash
-python client.py [OPTIONS] rep_create_org <organization> <username> <name> <email> <pub_key_file>
+rep_create_org [OPTIONS] <organization> <username> <name> <email> <pub_key_file>
 ```
 
 ### Parameters
@@ -61,7 +61,7 @@ The `rep_list_orgs` command retrieves and displays a list of organizations curre
 
 ### Usage
 ```bash
-python client.py [OPTIONS] rep_list_orgs
+rep_list_orgs [OPTIONS]
 ```
 This command does not require any arguments.
 
@@ -84,7 +84,7 @@ The `rep_add_doc` command encrypts and uploads a document to the system, using a
 
 ### Usage
 ```bash
-python client.py [OPTIONS] rep_add_doc <session_file> <document_name> <file>
+rep_add_doc [OPTIONS] <session_file> <document_name> <file>
 ```
 The command will read the session token, encrypt the specified document, and upload the encrypted data to the server.
 
