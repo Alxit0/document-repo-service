@@ -1,0 +1,66 @@
+import click
+import random
+import hashlib
+import base64
+import requests
+from file_encryption import encrypt_file, VALID_ALGOS_MODES_COMBOS
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('document_name', required=True, type=str)
+@click.argument('file', required=True, type=click.Path(exists=True, dir_okay=False))
+def rep_add_doc(session_file: str, document_name: str, file: str):
+
+    # Extract session
+    with open(session_file, 'r') as f:
+        session = f.read()
+
+    # encrypt file
+    algo, mode = random.choice(VALID_ALGOS_MODES_COMBOS)
+    
+    encrypted_file_data, key, iv, nonce = encrypt_file(file, algo, mode)
+
+    # gen digest for file handle
+    with open(file, 'rb') as f:
+        file_handle = hashlib.sha256(f.read()).hexdigest()
+
+    # Encode encrypted file and IV for JSON compatibility
+    encrypted_file_b64 = base64.b64encode(encrypted_file_data).decode('utf-8')
+    iv_b64 = base64.b64encode(iv).decode('utf-8')
+    key_b64 = base64.b64encode(key).decode('utf-8')
+    nonce_b64 = base64.b64encode(nonce).decode('utf-8')
+
+    # Prepare request data
+    headers = {
+        "session": session
+    }
+
+    data = {
+        "encrypted_file": encrypted_file_b64,
+        "name": document_name,
+        "file_handle": file_handle,
+        
+        "iv": iv_b64,
+        "encryption_key": key_b64,
+        "nonce": nonce_b64,
+        "algorithm": f"{algo}-{mode}",
+    }
+
+    # Send the request to upload the encrypted file
+    response = requests.post(
+        f"http://{utils.state['REP_ADDRESS']}/file/upload",
+        json=data,
+        headers=headers
+    )
+
+    # Check response
+    if response.status_code == 200:
+        print("Document uploaded successfully.")
+    else:
+        print("Failed to upload document:", response.text)
+
+if __name__ == '__main__':
+    rep_add_doc()
