@@ -280,7 +280,7 @@ def ping():
     return json.dumps({"status": "up"})
 
 @app.route("/file/metadata", methods=['GET'])
-@verify_session
+@verify_session()
 @verify_args(["document_name"])
 def get_doc_metadata():
 

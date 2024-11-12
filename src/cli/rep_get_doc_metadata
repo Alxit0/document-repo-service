@@ -18,10 +18,14 @@ def rep_get_doc_metadata(session_file: str, document_name: str):
     headers = {
             "session": session
     }
+    params = {
+        "document_name": document_name
+    }
 
     res = requests.get(
-        f"http://{utils.state['REP_ADDRESS']}/file/metadata/{document_name}",
-        headers=headers
+        f"http://{utils.state['REP_ADDRESS']}/file/metadata",
+        headers=headers,
+        params=params
     )
 
     if res.status_code != 200:
