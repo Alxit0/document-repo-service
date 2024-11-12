@@ -20,7 +20,7 @@ def rep_get_doc_metadata(session_file: str, document_name: str):
     }
 
     res = requests.get(
-        f"http://{utils.state['REP_ADDRESS']}/document/metadata/{document_name}",
+        f"http://{utils.state['REP_ADDRESS']}/file/metadata/{document_name}",
         headers=headers
     )
 
