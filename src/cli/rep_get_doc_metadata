@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import requests
+import json
+import click
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('document_name', required=True, type=str)
+def rep_get_doc_metadata(session_file: str, document_name: str):
+     
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+    headers = {
+            "session": session
+    }
+
+    res = requests.get(
+        f"http://{utils.state['REP_ADDRESS']}/document/metadata/{document_name}",
+        headers=headers
+    )
+
+    if res.status_code != 200:
+        logger.error(f"Failed to fetch metadata for document '{document_name}': {res.text}")
+        return
+    
+    doc_metadata = json.loads(res.content)
+    logger.info(f"Metadata for document '{document_name}':")
+    print(json.dumps(doc_metadata, indent=4))
+
+
+
+if __name__ == '__main__':
+    rep_get_doc_metadata()
