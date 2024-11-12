@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime
 from functools import wraps
 import os
 from flask import Flask, jsonify, request
@@ -273,6 +274,88 @@ def upload_file():
         "document_id": doc_id,
         "file_handle": file_handle
     }), 200
+
+
+@app.route("/file/list")
+@verify_session()
+def list_docs():
+    # parse args
+    username = request.args.get("username", "")
+    date = request.args.get("date", "")
+    date_filter_type = request.args.get("date_filter_type", "")  # nt | ot | et
+
+    # session data
+    tk_data = extrat_token_info(request.headers['session'])
+    org_id = tk_data['org']
+
+    # get data from db
+    con = get_db()
+    cur = con.cursor()
+
+    # basic query
+    query = """
+        SELECT
+            documents.handle AS doc_handle,
+            documents.name AS doc_name,
+            subjects.username AS sub_name,
+            documents.created_at AS doc_created_at
+        FROM
+            documents
+        JOIN
+            subjects ON documents.created_by = subjects.id
+        WHERE
+            documents.organization_id = ?
+    """
+    params = [org_id]
+
+    # add optional filter for username
+    if username:
+        query += " AND subjects.username = ?"
+        params.append(username)
+
+    # add optional filter for date
+    if date:
+        # ensure date is a valid format
+        try:
+            filter_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+        # filter based on date_filter_type
+        if date_filter_type == "nt":  # newer than
+            query += " AND DATE(documents.created_at) >= ?"
+        elif date_filter_type == "ot":  # older than
+            query += " AND DATE(documents.created_at) <= ?"
+        elif date_filter_type == "et":  # equal to
+            query += " AND DATE(documents.created_at) = ?"
+        else:
+            return jsonify({"error": "Invalid date filter type. Use 'nt', 'ot', or 'et'."}), 400
+    
+        params.append(filter_date.date())
+        
+
+    try:
+        cur.execute(query, params)
+        docs = cur.fetchall()
+
+        doc_list = [
+            {
+                "name": doc[1],
+                "handle": doc[0],
+                "created_by": doc[2],
+                "created_at": doc[3]
+            }
+            for doc in docs
+        ]
+
+        return jsonify({"status": "success", "documents": doc_list})
+    
+    except Exception as e:
+        con.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
 
 
 @app.route("/ping")
