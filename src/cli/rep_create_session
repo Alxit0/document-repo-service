@@ -20,7 +20,7 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
     
     # get challenge
     params = {"username": username}
-    res = requests.get(f'http://{utils.state['REP_ADDRESS']}/session/challenge', params=params)
+    res = requests.get(f"http://{utils.state['REP_ADDRESS']}/session/challenge", params=params)
 
     logger.debug(res)
     if res.status_code != 200:
@@ -60,7 +60,7 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
         "signature": base64.b64encode(signature).decode()
     }
 
-    res = requests.post(f'http://{utils.state['REP_ADDRESS']}/session/create', json=payload)
+    res = requests.post("http://{utils.state['REP_ADDRESS']}/session/create", json=payload)
     logger.debug(res)
     logger.info(res.content.decode())
     

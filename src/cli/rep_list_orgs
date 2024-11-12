@@ -9,7 +9,7 @@ from utils import default_command, logger
 @default_command
 def rep_list_orgs():
 
-    res = requests.get(f'http://{utils.state['REP_ADDRESS']}/organization/list')
+    res = requests.get(f"http://{utils.state['REP_ADDRESS']}/organization/list")
 
     # check status of api call    
     logger.debug(res)

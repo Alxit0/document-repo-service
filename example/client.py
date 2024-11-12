@@ -55,7 +55,7 @@ def parse_args(state):
 
     if args.key:
         if not os.path.exists(args.key[0]) or not os.path.isfile(args.key[0]):
-            logger.error(f'Key file not found or invalid: {args.key[0]}')
+            logger.error(f"Key file not found or invalid: {args.key[0]}")
             sys.exit(-1)
         
         with open(args.key[0], 'r') as f:
@@ -84,6 +84,6 @@ state = parse_env(state)
 state = parse_args(state)
 
 """ Do something """
-req = requests.get(f'http://{state['REP_ADDRESS']}/organization/list')
+req = requests.get("http://{state['REP_ADDRESS']}/organization/list")
 print(req.json)
 save(state)
