@@ -243,10 +243,10 @@ def upload_file():
     try:
         cur.execute(
             """
-            INSERT INTO documents (handle, name, content, organization_id, created_by)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO documents (handle, name, organization_id, created_by)
+            VALUES (?, ?, ?, ?)
             """,
-            (file_handle, document_name, encrypted_file, org_id, usr_id)
+            (file_handle, document_name, org_id, usr_id)
         )
         doc_id = cur.lastrowid
 
@@ -265,7 +265,15 @@ def upload_file():
     finally:
         cur.close()
 
-    return jsonify({"status": "Document uploaded successfully", "document_id": doc_id}), 200
+    # save file
+    with open(f"docs_repo/{file_handle}", "+w") as file:
+        file.write(encrypted_file)
+
+    return jsonify({
+        "status": "Document uploaded successfully",
+        "document_id": doc_id,
+        "file_handle": file_handle
+    }), 200
 
 
 @app.route("/file/list")
