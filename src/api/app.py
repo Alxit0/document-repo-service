@@ -288,7 +288,6 @@ def get_doc_metadata():
 
     session_data = extrat_token_info(request.headers['session'])
     org_id = session_data['org']
-    usr_id = session_data['usr']
 
     db = get_db()
     cur = db.cursor()
@@ -310,9 +309,8 @@ def get_doc_metadata():
                     WHERE
                         d.name = ? AND
                         d.organization_id = ? AND
-                        d.created_by = ?
                     """
-            ,(doc_name,org_id,usr_id)
+            ,(doc_name,org_id)
         )
         
         result = cur.fetchone()
@@ -333,7 +331,7 @@ def get_doc_metadata():
         return jsonify({"status": "success", "metadata": doc_metadata}),200
     except Exception as e:
         db.rollback()
-        return jsonify({""}), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
 
 
