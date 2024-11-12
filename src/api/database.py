@@ -1,7 +1,9 @@
+import os
 import sqlite3
 from flask import g, current_app
 
 DATABASE = 'database.db'
+
 SCHEMA = 'schema.sql'
 
 def get_db() -> sqlite3.Connection:
@@ -41,4 +43,7 @@ def initialize_db():
         db.executescript(f.read())
 
     db.commit()
+
+    # make dir for docs
+    os.makedirs("docs_repo", exist_ok=True)
     print("Database initialized with schema.")
