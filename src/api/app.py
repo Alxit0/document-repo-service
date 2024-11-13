@@ -23,7 +23,14 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            data = request.args if request.method == 'GET' else request.get_json()
+            if request.method == 'GET':
+                data = request.args
+            elif request.content_type == 'application/json':
+                data = request.get_json() or {}
+            elif request.content_type.startswith('multipart/form-data'):
+                data = request.form
+            else:
+                return jsonify({"error": "Unsupported Media Type"}), 415
             
             # Validate required fields
             needed_fields = []
@@ -216,13 +223,17 @@ def authenticate():
 
 @app.route("/file/upload", methods=['POST'])
 @verify_session()
-@verify_args(["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
+@verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
 
-    data = request.get_json()
+    # Check if the document file is part of the request
+    if 'document' not in request.files:
+        return jsonify({"error": "No document file provided"}), 400
+
+    data = request.form
 
     # parse JSON
-    encrypted_file = data["encrypted_file"]
+    document_file = request.files['document']
     document_name = data["name"]
     file_handle = data["file_handle"]
     
@@ -265,9 +276,9 @@ def upload_file():
     finally:
         cur.close()
 
-    # save file
-    with open(f"{REPO_PATH}/{file_handle}", "+w") as file:
-        file.write(encrypted_file)
+    # Save the uploaded file to the specified path
+    save_path = os.path.join(REPO_PATH, file_handle)
+    document_file.save(save_path)
 
     return jsonify({
         "status": "Document uploaded successfully",

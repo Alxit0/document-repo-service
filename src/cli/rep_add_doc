@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import io
+import os
 import click
 import random
 import hashlib
@@ -30,7 +32,6 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
         file_handle = hashlib.sha256(f.read()).hexdigest()
 
     # Encode encrypted file and IV for JSON compatibility
-    encrypted_file_b64 = base64.b64encode(encrypted_file_data).decode('utf-8')
     iv_b64 = base64.b64encode(iv).decode('utf-8')
     key_b64 = base64.b64encode(key).decode('utf-8')
     nonce_b64 = base64.b64encode(nonce).decode('utf-8')
@@ -41,24 +42,27 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
     }
 
     data = {
-        "encrypted_file": encrypted_file_b64,
         "name": document_name,
         "file_handle": file_handle,
-        
-        "iv": iv_b64,
-        "encryption_key": key_b64,
-        "nonce": nonce_b64,
         "algorithm": f"{algo}-{mode}",
+        "encryption_key": key_b64,
+        "iv": iv_b64,
+        "nonce": nonce_b64
     }
-
+    
+    files = {
+        "document": io.BytesIO(encrypted_file_data)
+    }
+    
     # Send the request to upload the encrypted file
     response = requests.post(
         f"http://{utils.state['REP_ADDRESS']}/file/upload",
-        json=data,
+        data=data,
+        files=files,
         headers=headers
     )
 
-    # Check response
+    # Check the response
     if response.status_code == 200:
         print("Document uploaded successfully.")
     else:
