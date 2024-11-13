@@ -308,9 +308,9 @@ def get_doc_metadata():
                         document_metadata dm ON d.id = dm.document_id
                     WHERE
                         d.name = ? AND
-                        d.organization_id = ? AND
+                        d.organization_id = ?
                     """
-            ,(doc_name,org_id)
+            ,(doc_name, org_id)
         )
         
         result = cur.fetchone()
@@ -332,6 +332,8 @@ def get_doc_metadata():
     except Exception as e:
         db.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
 
 
 
