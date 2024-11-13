@@ -2,10 +2,10 @@ import base64
 from datetime import datetime
 from functools import wraps
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 import json
 
-from database import initialize_db, close_db, get_db
+from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
@@ -266,7 +266,7 @@ def upload_file():
         cur.close()
 
     # save file
-    with open(f"docs_repo/{file_handle}", "+w") as file:
+    with open(f"{REPO_PATH}/{file_handle}", "+w") as file:
         file.write(encrypted_file)
 
     return jsonify({
@@ -356,6 +356,17 @@ def list_docs():
     
     finally:
         cur.close()
+
+
+@app.route("/file/download/<file_handle>")
+def get_file(file_handle: str):
+
+    file_path = os.path.join(REPO_PATH, file_handle)
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+    
+    return send_file(file_path, as_attachment=True), 200
 
 
 @app.route("/ping")
