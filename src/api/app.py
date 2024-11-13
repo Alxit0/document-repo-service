@@ -2,10 +2,10 @@ import base64
 from datetime import datetime
 from functools import wraps
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 import json
 
-from database import initialize_db, close_db, get_db
+from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
@@ -23,7 +23,14 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            data = request.args if request.method == 'GET' else request.get_json()
+            if request.method == 'GET':
+                data = request.args
+            elif request.content_type == 'application/json':
+                data = request.get_json() or {}
+            elif request.content_type.startswith('multipart/form-data'):
+                data = request.form
+            else:
+                return jsonify({"error": "Unsupported Media Type"}), 415
             
             # Validate required fields
             needed_fields = []
@@ -216,13 +223,17 @@ def authenticate():
 
 @app.route("/file/upload", methods=['POST'])
 @verify_session()
-@verify_args(["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
+@verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
 
-    data = request.get_json()
+    # Check if the document file is part of the request
+    if 'document' not in request.files:
+        return jsonify({"error": "No document file provided"}), 400
+
+    data = request.form
 
     # parse JSON
-    encrypted_file = data["encrypted_file"]
+    document_file = request.files['document']
     document_name = data["name"]
     file_handle = data["file_handle"]
     
@@ -265,9 +276,9 @@ def upload_file():
     finally:
         cur.close()
 
-    # save file
-    with open(f"docs_repo/{file_handle}", "+w") as file:
-        file.write(encrypted_file)
+    # Save the uploaded file to the specified path
+    save_path = os.path.join(REPO_PATH, file_handle)
+    document_file.save(save_path)
 
     return jsonify({
         "status": "Document uploaded successfully",
@@ -356,6 +367,17 @@ def list_docs():
     
     finally:
         cur.close()
+
+
+@app.route("/file/download/<file_handle>")
+def get_file(file_handle: str):
+
+    file_path = os.path.join(REPO_PATH, file_handle)
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+    
+    return send_file(file_path, as_attachment=True), 200
 
 
 @app.route("/ping")
