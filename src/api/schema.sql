@@ -17,7 +17,7 @@ CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     handle TEXT NOT NULL UNIQUE,   -- identifier for the document
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
 
     organization_id INTEGER,
     created_by INTEGER,            -- subject id of creator

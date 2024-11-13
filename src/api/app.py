@@ -362,6 +362,64 @@ def list_docs():
 def ping():
     return json.dumps({"status": "up"})
 
+@app.route("/file/metadata", methods=['GET'])
+@verify_session()
+@verify_args(["document_name"])
+def get_doc_metadata():
+
+    doc_name = request.args.get("document_name")
+
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    db = get_db()
+    cur = db.cursor()
+    
+    try:
+        cur.execute("""
+                    SELECT
+                        d.id AS document_id,
+                        d.handle AS file_handle,
+                        d.name AS document_name,
+                        dm.encryption_key,
+                        dm.alg,
+                        dm.iv,
+                        dm.nonce
+                    FROM
+                        documents d
+                    JOIN
+                        document_metadata dm ON d.id = dm.document_id
+                    WHERE
+                        d.name = ? AND
+                        d.organization_id = ?
+                    """
+            ,(doc_name, org_id)
+        )
+        
+        result = cur.fetchone()
+
+        if result == None:
+            return jsonify({"error":"Document not found"}),404
+        
+        doc_metadata = {
+            "document_id": result[0],
+            "file_handle": result[1],
+            "document_name": result[2],
+            "encryption_key": result[3],
+            "algorithm": result[4],
+            "iv": result[5],
+            "nonce": result[6]
+        }
+
+        return jsonify({"status": "success", "metadata": doc_metadata}),200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
