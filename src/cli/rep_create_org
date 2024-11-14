@@ -29,6 +29,7 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     res = requests.post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
     logger.debug(res)
     logger.info(res.content.decode())
+    exit(0)
 
 
 if __name__ == '__main__':
