@@ -441,7 +441,12 @@ def get_doc_metadata():
         cur.close()
 
 
-
+#subject endpoints
+@app.route("/subject/add", methods=['POST'])
+@verify_session()
+@verify_args()
+def add_subject():
+    pass
 
 if __name__ == '__main__':
     app.run(debug=True)

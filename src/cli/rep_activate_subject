@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+
+import click
+
+import utils
+from utils import default_command, logger
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('usename',required=True, type=str)
+def rep_activate_subject():
+    pass
+
+if __name__ == '__main__':
+    rep_activate_subject()
