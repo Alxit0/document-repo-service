@@ -3,6 +3,7 @@
 import click
 import requests
 
+import json
 import utils
 from utils import default_command, logger
 
@@ -16,7 +17,9 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     
     # read public key
     with open(pub_key_file, 'r') as file:
-        public_key = file.read()
+        #public_key = file.read()
+        credentials = json.load(file)
+        public_key = credentials.get('REP_PUB_KEY')
     
     body = {
         "organization": organization,
@@ -26,7 +29,7 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
         "public_key": public_key
     }
 
-    res = requests.post(f'http://{utils.state['REP_ADDRESS']}/organization/create', json=body)
+    res = requests.post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
     logger.debug(res)
     logger.info(res.content.decode())
 
