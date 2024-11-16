@@ -118,3 +118,66 @@ The command will read the session token, encrypt the specified document, and upl
 ### Notes
 - Ensure that both the session file and document file paths are valid and exist.
 - The encryption algorithm and mode are randomly selected from a list of valid combinations
+
+## Command: `rep_list_docs`
+The `rep_list_docs` command retrieves a list of documents, with options to filter results by username and/or date. Authentication is handled through a session file containing a session token.
+
+### Usage
+```bash
+rep_list_docs [OPTIONS] <session_file>
+```
+
+This command reads the session token from the provided session file and retrieves document information from the server. Optional filters include username and date.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token used for authentication. This file must exist and contain a valid session token.
+- `username` (optional): Username to filter the document list. Only documents associated with this username will be shown.
+- `date` (optional): A date filter to narrow down results by specific date criteria. Specify the date in two parts:
+  - Filter type: Use one of the following:
+    - `'nt'` - Show documents on or after the specified date
+    - `'ot'` - Show documents on or before the specified date
+    - `'et'` - Show documents from exactly the specified date
+  - Date value: Format the date as `'YYYY-MM-DD'`
+
+### Notes
+- If the `date` option is used, ensure the format follows `[nt|ot|et] YYYY-MM-DD`.
+- Invalid date formats or unsupported filter types will return an error message.
+- The command communicates with the server endpoint `http://localhost:5000/file/list`, passing the session token in the request header and applying any specified filters.
+
+## Command: `rep_get_file`
+The `rep_get_file` command retrieves a specified file from the server using its unique handle. The command can print the file contents directly or save them to a specified file path.
+
+### Usage
+```bash
+rep_get_file [OPTIONS] <file_handle> [file]
+```
+
+This command downloads a file identified by `file_handle` from the server. If a file path is provided, the content is saved to this location; otherwise, it is printed to the console in base64 encoding.
+
+### Parameters
+- `file_handle` (required): The unique identifier for the file on the server.
+- `file` (optional): The local path where the downloaded file will be saved. If omitted, the file content is printed in base64 format.
+
+### Notes
+- If `file` is not provided, the file content will be displayed in base64-encoded format in the console.
+- The server endpoint for downloading files is derived from `utils.state['REP_ADDRESS']` combined with `/file/download/{file_handle}`.
+- Ensure that `utils.state['REP_ADDRESS']` is set correctly to connect to the proper server address.
+
+## Command: `rep_get_doc_metadata`
+The `rep_get_doc_metadata` command retrieves metadata for a specific document on the server using a session token for authentication.
+
+### Usage
+```bash
+rep_get_doc_metadata [OPTIONS] <session_file> <document_name>
+```
+
+This command reads the session token from `session_file` and fetches metadata for the document identified by `document_name`. The metadata is printed in JSON format.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token for authentication.
+- `document_name` (required): The name of the document for which metadata is requested.
+
+### Notes
+- If metadata retrieval fails, an error message with the server’s response is displayed.
+- The server endpoint for retrieving metadata is `http://{utils.state['REP_ADDRESS']}/file/metadata`.
+- Ensure `utils.state['REP_ADDRESS']` contains the correct server address for the metadata request to succeed.

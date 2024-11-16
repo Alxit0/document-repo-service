@@ -162,3 +162,4 @@ cython_debug/
 # random stuff
 temp*
 *.db
+docs_repo/

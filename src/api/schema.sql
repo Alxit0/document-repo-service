@@ -17,9 +17,8 @@ CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     handle TEXT NOT NULL UNIQUE,   -- identifier for the document
-    name TEXT NOT NULL,
-    content BLOB,                  -- binary data for file storage, if needed for Delivery 1
-    
+    name TEXT NOT NULL UNIQUE,
+
     organization_id INTEGER,
     created_by INTEGER,            -- subject id of creator
     

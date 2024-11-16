@@ -1,10 +1,11 @@
 import base64
+from datetime import datetime
 from functools import wraps
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 import json
 
-from database import initialize_db, close_db, get_db
+from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
@@ -22,7 +23,14 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            data = request.args if request.method == 'GET' else request.get_json()
+            if request.method == 'GET':
+                data = request.args
+            elif request.content_type == 'application/json':
+                data = request.get_json() or {}
+            elif request.content_type.startswith('multipart/form-data'):
+                data = request.form
+            else:
+                return jsonify({"error": "Unsupported Media Type"}), 415
             
             # Validate required fields
             needed_fields = []
@@ -215,13 +223,17 @@ def authenticate():
 
 @app.route("/file/upload", methods=['POST'])
 @verify_session()
-@verify_args(["encrypted_file", "name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
+@verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
 
-    data = request.get_json()
+    # Check if the document file is part of the request
+    if 'document' not in request.files:
+        return jsonify({"error": "No document file provided"}), 400
+
+    data = request.form
 
     # parse JSON
-    encrypted_file = data["encrypted_file"]
+    document_file = request.files['document']
     document_name = data["name"]
     file_handle = data["file_handle"]
     
@@ -242,10 +254,10 @@ def upload_file():
     try:
         cur.execute(
             """
-            INSERT INTO documents (handle, name, content, organization_id, created_by)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO documents (handle, name, organization_id, created_by)
+            VALUES (?, ?, ?, ?)
             """,
-            (file_handle, document_name, encrypted_file, org_id, usr_id)
+            (file_handle, document_name, org_id, usr_id)
         )
         doc_id = cur.lastrowid
 
@@ -264,12 +276,171 @@ def upload_file():
     finally:
         cur.close()
 
-    return jsonify({"status": "Document uploaded successfully", "document_id": doc_id}), 200
+    # Save the uploaded file to the specified path
+    save_path = os.path.join(REPO_PATH, file_handle)
+    document_file.save(save_path)
+
+    return jsonify({
+        "status": "Document uploaded successfully",
+        "document_id": doc_id,
+        "file_handle": file_handle
+    }), 200
+
+
+@app.route("/file/list")
+@verify_session()
+def list_docs():
+    # parse args
+    username = request.args.get("username", "")
+    date = request.args.get("date", "")
+    date_filter_type = request.args.get("date_filter_type", "")  # nt | ot | et
+
+    # session data
+    tk_data = extrat_token_info(request.headers['session'])
+    org_id = tk_data['org']
+
+    # get data from db
+    con = get_db()
+    cur = con.cursor()
+
+    # basic query
+    query = """
+        SELECT
+            documents.handle AS doc_handle,
+            documents.name AS doc_name,
+            subjects.username AS sub_name,
+            documents.created_at AS doc_created_at
+        FROM
+            documents
+        JOIN
+            subjects ON documents.created_by = subjects.id
+        WHERE
+            documents.organization_id = ?
+    """
+    params = [org_id]
+
+    # add optional filter for username
+    if username:
+        query += " AND subjects.username = ?"
+        params.append(username)
+
+    # add optional filter for date
+    if date:
+        # ensure date is a valid format
+        try:
+            filter_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+        # filter based on date_filter_type
+        if date_filter_type == "nt":  # newer than
+            query += " AND DATE(documents.created_at) >= ?"
+        elif date_filter_type == "ot":  # older than
+            query += " AND DATE(documents.created_at) <= ?"
+        elif date_filter_type == "et":  # equal to
+            query += " AND DATE(documents.created_at) = ?"
+        else:
+            return jsonify({"error": "Invalid date filter type. Use 'nt', 'ot', or 'et'."}), 400
+    
+        params.append(filter_date.date())
+        
+
+    try:
+        cur.execute(query, params)
+        docs = cur.fetchall()
+
+        doc_list = [
+            {
+                "name": doc[1],
+                "handle": doc[0],
+                "created_by": doc[2],
+                "created_at": doc[3]
+            }
+            for doc in docs
+        ]
+
+        return jsonify({"status": "success", "documents": doc_list})
+    
+    except Exception as e:
+        con.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@app.route("/file/download/<file_handle>")
+def get_file(file_handle: str):
+
+    file_path = os.path.join(REPO_PATH, file_handle)
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+    
+    return send_file(file_path, as_attachment=True), 200
 
 
 @app.route("/ping")
 def ping():
     return json.dumps({"status": "up"})
+
+@app.route("/file/metadata", methods=['GET'])
+@verify_session()
+@verify_args(["document_name"])
+def get_doc_metadata():
+
+    doc_name = request.args.get("document_name")
+
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    db = get_db()
+    cur = db.cursor()
+    
+    try:
+        cur.execute("""
+                    SELECT
+                        d.id AS document_id,
+                        d.handle AS file_handle,
+                        d.name AS document_name,
+                        dm.encryption_key,
+                        dm.alg,
+                        dm.iv,
+                        dm.nonce
+                    FROM
+                        documents d
+                    JOIN
+                        document_metadata dm ON d.id = dm.document_id
+                    WHERE
+                        d.name = ? AND
+                        d.organization_id = ?
+                    """
+            ,(doc_name, org_id)
+        )
+        
+        result = cur.fetchone()
+
+        if result == None:
+            return jsonify({"error":"Document not found"}),404
+        
+        doc_metadata = {
+            "document_id": result[0],
+            "file_handle": result[1],
+            "document_name": result[2],
+            "encryption_key": result[3],
+            "algorithm": result[4],
+            "iv": result[5],
+            "nonce": result[6]
+        }
+
+        return jsonify({"status": "success", "metadata": doc_metadata}),200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
 
 
 if __name__ == '__main__':

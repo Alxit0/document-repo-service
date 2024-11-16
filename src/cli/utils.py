@@ -36,7 +36,11 @@ def load_state():
 def parse_env(state):
     if 'REP_ADDRESS' in os.environ:
         state['REP_ADDRESS'] = os.getenv('REP_ADDRESS')
+<<<<<<< HEAD
         logger.debug(f"Setting REP_ADDRESS from Environment to: {state['REP_ADDRESS']}")
+=======
+        logger.debug(f"Setting REP_ADDRESS from Environment to: {state["REP_ADDRESS"]}")
+>>>>>>> main
 
     if 'REP_PUB_KEY' in os.environ:
         rep_pub_key = os.getenv('REP_PUB_KEY')
@@ -54,7 +58,7 @@ def parse_args(state, key, repo, verbose):
 
     if key:
         if not os.path.exists(key) or not os.path.isfile(key):
-            logger.error(f'Key file not found or invalid: {key}')
+            logger.error(f"Key file not found or invalid: {key}")
             sys.exit(-1)
         
         with open(key, 'r') as f:
