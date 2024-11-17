@@ -9,5 +9,5 @@ rm src/cli/*_cred.json
 #delete org sessions
 rm src/cli/*_session.json
 
-#delete semplefile
+#delete sample files
 rm $HOME/Documents/*_?.txt
