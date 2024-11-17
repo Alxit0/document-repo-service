@@ -1,13 +1,14 @@
 #!/bin/bash
+cd ..
 
 #delete database file
-rm src/api/database.db
+rm api/database.db
 
 #delete org credentials
-rm src/cli/*_cred.json
+rm cli/*_cred.json
 
 #delete org sessions
-rm src/cli/*_session.json
+rm cli/*_session.json
 
 #delete sample files
 rm $HOME/Documents/*_?.txt

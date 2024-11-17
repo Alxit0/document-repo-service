@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Set the repository address
-# Ensure to set this to your actual API server's network address
-export REP_ADDRESS="127.0.0.1:5000"  # Adjust this as necessary
+export REP_ADDRESS="127.0.0.1:5000" 
 
 # Set initial variables for Org
 PASSWORD_LOL="StrongPassword123"
@@ -37,7 +36,7 @@ FILE_HANDLE2="6d83b23024c75911246bc1756f0cab3d5a6234017129a0f7b4f8de2e4be1baee"
 DOWNLOAD_PATH2="$HOME/Downloads/WOW_1_copy.txt"
 
 # Change to the 'cli' directory
-cd src/cli
+cd .. && cd cli
 
 echo " "
 echo "======================================================"
@@ -47,7 +46,7 @@ echo "======================================================"
 ./rep_subject_credentials "$PASSWORD_LOL" "$CREDENTIALS_FILE_LOL"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Cerdentials"
+    echo "Error: Failed to create Cerdentials !!!"
     exit 1
 fi
 
@@ -55,7 +54,7 @@ fi
 ./rep_create_org "$ORG_LOL" "$USERNAME0" "$USER_NAME0" "$EMAIL0" "$CREDENTIALS_FILE_LOL"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Organization"
+    echo "Error: Failed to create Organization !!!"
     exit 1
 fi
 
@@ -68,7 +67,7 @@ echo "======================================================"
 ./rep_subject_credentials "$PASSWORD_WOW" "$CREDENTIALS_FILE_WOW"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Cerdentials"
+    echo "Error: Failed to create Cerdentials !!!"
     exit 1
 fi
 
@@ -76,7 +75,7 @@ fi
 ./rep_create_org "$ORG_WOW" "$USERNAME1" "$USER_NAME1" "$EMAIL1" "$CREDENTIALS_FILE_WOW"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Organization"
+    echo "Error: Failed to create Organization !!!"
     exit 1
 fi
 
@@ -88,7 +87,7 @@ echo "======================================================"
 ./rep_list_orgs
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Organizations"
+    echo "Error: Failed to list Organizations !!!"
     exit 1
 fi
 
@@ -123,7 +122,7 @@ echo "======================================================"
 ./rep_create_session "$ORG_LOL" "$USERNAME0" "$PASSWORD_LOL" "$CREDENTIALS_FILE_LOL" "$SESSION_FILE_LOL"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Session for Organization $ORG_LOL"
+    echo "Error: Failed to create Session for Organization $ORG_LOL !!!"
     exit 1
 fi
 
@@ -133,7 +132,7 @@ echo "Adding Document"
 ./rep_add_doc "$SESSION_FILE_LOL" "$DOCUMENT_NAME0" "$DOCUMENT_PATH0"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to add Document $DOCUMENT_NAME0"
+    echo "Error: Failed to add Document $DOCUMENT_NAME0 !!!"
     exit 1
 fi
 
@@ -143,7 +142,7 @@ echo "Adding Document"
 ./rep_add_doc "$SESSION_FILE_LOL" "$DOCUMENT_NAME1" "$DOCUMENT_PATH1"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to add Document $DOCUMENT_NAME1"
+    echo "Error: Failed to add Document $DOCUMENT_NAME1 !!!"
     exit 1
 fi
 
@@ -155,7 +154,7 @@ echo "======================================================"
 ./rep_create_session "$ORG_WOW" "$USERNAME1" "$PASSWORD_WOW" "$CREDENTIALS_FILE_WOW" "$SESSION_FILE_WOW"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to create Session for Organization $ORG_WOW"
+    echo "Error: Failed to create Session for Organization $ORG_WOW !!!"
     exit 1
 fi
 
@@ -166,7 +165,7 @@ echo "Adding Document"
 ./rep_add_doc "$SESSION_FILE_WOW" "$DOCUMENT_NAME2" "$DOCUMENT_PATH2"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to add Document $DOCUMENT_NAME1"
+    echo "Error: Failed to add Document $DOCUMENT_NAME1 !!!"
     exit 1
 fi
 
@@ -178,7 +177,7 @@ echo "======================================================"
 ./rep_list_docs "$SESSION_FILE_LOL"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Docs"
+    echo "Error: Failed to list Docs !!!"
     exit 1
 fi
 
@@ -191,7 +190,7 @@ echo "======================================================"
 ./rep_list_docs "$SESSION_FILE_WOW"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Docs"
+    echo "Error: Failed to list Docs !!!"
     exit 1
 fi
 
@@ -204,7 +203,7 @@ echo "======================================================"
 ./rep_get_doc_metadata "$SESSION_FILE_LOL" "$DOCUMENT_NAME0"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Docs"
+    echo "Error: Failed to get Metadata of $DOCUMENT_NAME0 !!!"
     exit 1
 fi
 
@@ -214,7 +213,7 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 ./rep_get_doc_metadata "$SESSION_FILE_LOL" "$DOCUMENT_NAME1"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Docs"
+    echo "Error: Failed to get Metadata of $DOCUMENT_NAME1 !!!"
     exit 1
 fi
 
@@ -224,7 +223,7 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 ./rep_get_doc_metadata "$SESSION_FILE_WOW" "$DOCUMENT_NAME2"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to list Docs"
+    echo "Error: Failed to get Metadata of $DOCUMENT_NAME2 !!!"
     exit 1
 fi
 
@@ -247,7 +246,7 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 ./rep_get_file "$FILE_HANDLE1" "$DOWNLOAD_PATH1"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to get file"
+    echo "Error: Failed to get file !!!"
     exit 1
 fi
 
@@ -257,7 +256,7 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 ./rep_get_file "$FILE_HANDLE2" "$DOWNLOAD_PATH2"
 if [ $? -ne 0 ]
 then
-    echo "Error: Failed to get file"
+    echo "Error: Failed to get file !!!"
     exit 1
 fi
 
