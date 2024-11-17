@@ -24,12 +24,18 @@ SESSION_FILE_WOW="WOW_session.json"
 
 DOCUMENT_PATH0="$HOME/Documents/LOL_1.txt"
 DOCUMENT_NAME0="LOL_1"
+FILE_HANDLE0="b367cfbe8009b171bd85c0294aa4a8dd1242d026820171f864aad9dd77fa8024"
 
 DOCUMENT_PATH1="$HOME/Documents/LOL_2.txt"
 DOCUMENT_NAME1="LOL_2"
+FILE_HANDLE1="35e34d121176ffa0793c26966528f0037e54efd9e617598513a7f425b1abae90"
+DOWNLOAD_PATH1="$HOME/Downloads/LOL_2_copy.txt"
 
 DOCUMENT_PATH2="$HOME/Documents/WOW_1.txt"
 DOCUMENT_NAME2="WOW_1"
+FILE_HANDLE2="6d83b23024c75911246bc1756f0cab3d5a6234017129a0f7b4f8de2e4be1baee"
+DOWNLOAD_PATH2="$HOME/Downloads/WOW_1_copy.txt"
+
 # Change to the 'cli' directory
 cd src/cli
 
@@ -140,7 +146,6 @@ echo " "
 echo "======================================================"
 echo "|              Get Docs Metadata                     |"
 echo "======================================================"
-echo "Get Docs Metadata"
 
 # Doc0 in LOL Session
 ./rep_get_doc_metadata "$SESSION_FILE_LOL" "$DOCUMENT_NAME0"
@@ -167,6 +172,39 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 if [ $? -ne 0 ]
 then
     echo "Error: Failed to list Docs"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Get File                           |"
+echo "======================================================"
+
+# get file and print in terminal
+./rep_get_file "$FILE_HANDLE0"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
+    exit 1
+fi
+
+echo " "
+echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
+# get file and Download it
+./rep_get_file "$FILE_HANDLE1" "$DOWNLOAD_PATH1"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
+    exit 1
+fi
+
+echo " "
+echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
+# get file and Download it
+./rep_get_file "$FILE_HANDLE2" "$DOWNLOAD_PATH2"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
     exit 1
 fi
 
