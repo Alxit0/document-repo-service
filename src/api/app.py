@@ -5,6 +5,7 @@ import os
 from flask import Flask, jsonify, request, send_file
 import json
 
+from secure_communication import secure_endpoint
 from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
@@ -24,9 +25,15 @@ def verify_args(required_fields):
         def wrapper(*args, **kwargs):
             # get data
             if request.method == 'GET':
-                data = request.args
+                try:
+                    data = request.decrypted_params
+                except:
+                    data = request.args
             elif request.content_type == 'application/json':
-                data = request.get_json() or {}
+                try:
+                    data = request.decrypted_params
+                except:
+                    data = request.get_json() or {}
             elif request.content_type.startswith('multipart/form-data'):
                 data = request.form
             else:
@@ -37,7 +44,7 @@ def verify_args(required_fields):
             for field in required_fields:
                 if field not in data:
                     needed_fields.append(field)
-            
+
             if needed_fields:
                 return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
             
@@ -52,7 +59,12 @@ def verify_session():
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get payload from request
-            data = request.headers
+            try:
+                data = request.decrypted_headers
+            except:
+                data = request.headers
+
+            
             if not data:
                 return jsonify({"error": "No JSON payload found"}), 400
             
@@ -217,7 +229,7 @@ def authenticate():
         'org': org_id,
         'usr': user_id
     }
-    print(token_info)
+
     return jsonify({"message": "Authentication successful", "session_token": write_token(token_info)}), 200
 
 
@@ -381,8 +393,11 @@ def get_file(file_handle: str):
 
 
 @app.route("/ping")
+@secure_endpoint()
+@verify_session()
+@verify_args(["name"])
 def ping():
-    return json.dumps({"status": "up"})
+    return jsonify({"status": "up"}), 200
 
 @app.route("/file/metadata", methods=['GET'])
 @verify_session()

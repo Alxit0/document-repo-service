@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+import requests
+import json
+
+import secure_requests
+import utils
+from utils import default_command, logger
+
+@default_command
+def ping():
+
+    with open("./temp_session.ses", 'r') as f:
+        session = f.read()
+    
+    headers = {
+        "session": session
+    }
+
+    res = secure_requests.secure_get(
+        f"http://{utils.state['REP_ADDRESS']}/ping",
+        params={"name":"Alex"},
+        headers=headers
+    )
+
+    # check status of api call    
+    logger.debug(res)
+    if res.status_code != 200:
+        print(json.loads(res.content))
+        return
+    
+    print(json.loads(res.content))
+
+if __name__ == '__main__':
+    ping()
