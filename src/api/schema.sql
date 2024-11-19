@@ -22,7 +22,7 @@ CREATE TABLE sub_org (
     UNIQUE (sub,org)
 )
 
-CREATE TABLE documents (
+CREATE TABLE documents (    
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     handle TEXT NOT NULL UNIQUE,   -- identifier for the document
