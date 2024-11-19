@@ -2,8 +2,8 @@
 
 import base64
 import click
-import requests
 
+import secure_requests
 import utils
 from utils import default_command, logger
 
@@ -13,11 +13,12 @@ from utils import default_command, logger
 def rep_get_file(file_handle: str, file: str):
     
     # Send the GET request to download the file
-    url = f"http://{utils.state['REP_ADDRESS']}/file/download/{file_handle}"
-    response = requests.get(url)
+    response = secure_requests.secure_get(
+        f"http://{utils.state['REP_ADDRESS']}/file/download/{file_handle}"
+    )
 
     # Check if the file exists on the server
-    if response.status_code != 200:
+    if response.status_code != 201:
         logger.info("Failed to download file:", response.json())
         return
     

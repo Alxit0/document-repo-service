@@ -35,7 +35,10 @@ def verify_args(required_fields):
                 except:
                     data = request.get_json() or {}
             elif request.content_type.startswith('multipart/form-data'):
-                data = request.form
+                try:
+                    data = request.decrypted_params
+                except:
+                    data = request.form
             else:
                 return jsonify({"error": "Unsupported Media Type"}), 415
             
@@ -86,6 +89,7 @@ def verify_session():
 
 # endpoints
 @app.route("/organization/list")
+@secure_endpoint()
 def org_list():
     db = get_db()
     cur = db.cursor()
@@ -109,7 +113,7 @@ def org_list():
             for org in organizations
         ]
 
-        return jsonify({"status": "success", "organizations": org_list})
+        return jsonify({"status": "success", "organizations": org_list}), 200
     
     except Exception as e:
         db.rollback()
@@ -120,13 +124,14 @@ def org_list():
 
 
 @app.route("/organization/create", methods=['POST'])
+@secure_endpoint()
 @verify_args(['organization', 'username', 'name', 'email', 'public_key'])
 def org_create():
     db = get_db()
     cur = db.cursor()
 
     # data parsing
-    data = request.get_json()
+    data = request.decrypted_params
     organization = data['organization']
     username = data['username']
     name = data['name']
@@ -149,7 +154,7 @@ def org_create():
         cur.execute("INSERT INTO organizations (name, created_by) VALUES (?, ?);", (organization, user_id))
         db.commit()
 
-        return jsonify({"id": cur.lastrowid, "organization": organization, "created_by": user_id}), 201
+        return jsonify({"id": cur.lastrowid, "organization": organization, "created_by": user_id}), 200
 
     except Exception as e:
         db.rollback()
@@ -160,22 +165,24 @@ def org_create():
 
 
 @app.route("/session/challenge")
+@secure_endpoint()
 @verify_args(['username'])
 def challenge():
 
-    data = request.args
+    data = request.decrypted_params
 
     # check if is already generated
     if data['username'] in challenges:
-        return json.dumps({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')})
+        return jsonify({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')}), 200
 
     # gen nonce
     nonce = data['username'].encode() + os.urandom(16)
     challenges[data['username']] = nonce
     
-    return json.dumps({"nounce": base64.b64encode(nonce).decode('utf-8')})
+    return jsonify({"nounce": base64.b64encode(nonce).decode('utf-8')}), 200
 
 @app.route("/session/create", methods=['POST'])
+@secure_endpoint()
 @verify_args(['organization', 'username', 'signature'])
 def authenticate():
     """
@@ -188,7 +195,7 @@ def authenticate():
         "encrypted_private_key": "base64_encoded_encrypted_private_key"
     }
     """
-    data = request.json
+    data = request.decrypted_params
     cur = get_db().cursor()
     
     # data parsing
@@ -234,6 +241,7 @@ def authenticate():
 
 
 @app.route("/file/upload", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
@@ -242,7 +250,7 @@ def upload_file():
     if 'document' not in request.files:
         return jsonify({"error": "No document file provided"}), 400
 
-    data = request.form
+    data = request.decrypted_params
 
     # parse JSON
     document_file = request.files['document']
@@ -255,7 +263,7 @@ def upload_file():
     nonce = data["nonce"]
     
     # Session data
-    ses_data = extrat_token_info(request.headers['session'])
+    ses_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = ses_data['org']
     usr_id = ses_data['usr']
 
@@ -300,15 +308,16 @@ def upload_file():
 
 
 @app.route("/file/list")
+@secure_endpoint()
 @verify_session()
 def list_docs():
     # parse args
-    username = request.args.get("username", "")
-    date = request.args.get("date", "")
-    date_filter_type = request.args.get("date_filter_type", "")  # nt | ot | et
+    username = request.decrypted_params.get("username", "")
+    date = request.decrypted_params.get("date", "")
+    date_filter_type = request.decrypted_params.get("date_filter_type", "")  # nt | ot | et
 
     # session data
-    tk_data = extrat_token_info(request.headers['session'])
+    tk_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = tk_data['org']
 
     # get data from db
@@ -371,7 +380,7 @@ def list_docs():
             for doc in docs
         ]
 
-        return jsonify({"status": "success", "documents": doc_list})
+        return jsonify({"status": "success", "documents": doc_list}), 200
     
     except Exception as e:
         con.rollback()
@@ -382,6 +391,7 @@ def list_docs():
 
 
 @app.route("/file/download/<file_handle>")
+@secure_endpoint()
 def get_file(file_handle: str):
 
     file_path = os.path.join(REPO_PATH, file_handle)
@@ -389,7 +399,7 @@ def get_file(file_handle: str):
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
     
-    return send_file(file_path, as_attachment=True), 200
+    return send_file(file_path, as_attachment=True), 201
 
 
 @app.route("/ping")
@@ -400,13 +410,14 @@ def ping():
     return jsonify({"status": "up"}), 200
 
 @app.route("/file/metadata", methods=['GET'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
 def get_doc_metadata():
 
-    doc_name = request.args.get("document_name")
+    doc_name = request.decrypted_params.get("document_name")
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
     db = get_db()

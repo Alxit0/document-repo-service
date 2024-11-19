@@ -4,6 +4,7 @@ import requests
 import json
 import click
 
+import secure_requests
 import utils
 from utils import default_command, logger
 
@@ -22,7 +23,7 @@ def rep_get_doc_metadata(session_file: str, document_name: str):
         "document_name": document_name
     }
 
-    res = requests.get(
+    res = secure_requests.secure_get(
         f"http://{utils.state['REP_ADDRESS']}/file/metadata",
         headers=headers,
         params=params

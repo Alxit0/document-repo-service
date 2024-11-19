@@ -1,4 +1,4 @@
-import json
+import json as json_lib
 import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, hmac
@@ -56,8 +56,9 @@ def secure_get(url, headers=None, params=None):
     response = requests.get(url, headers=headers, params={"payload": base64.b64encode(encrypted_params).decode()})
 
     # Step 5: Process the response
-    if not response.ok:
-        raise Exception(f"Request failed: {response.status_code} - {response.text}")
+
+    if response.status_code == 201:
+        return response
 
     # Extract encrypted response
     encrypted_response = base64.b64decode(response.json()["ciphertext"])
@@ -72,13 +73,13 @@ def secure_get(url, headers=None, params=None):
     response._content = decrypted_response
     return response
 
-def secure_post(url, headers=None, data=None):
-    if data is None:
-        data = {}
+def secure_post(url, headers=None, data=None, json=None, files=None):
+    if json and not data:
+        data = json
         
     # Step 1: Encrypt the parameters
     iv = os.urandom(16)
-    query_string = json.dumps(data)
+    query_string = json_lib.dumps(data)
     encrypted_params = encrypt_message(query_string, SHARED_SECRET_KEY, iv)
 
     # Step 2: Generate HMAC for the encrypted parameters
@@ -96,12 +97,20 @@ def secure_post(url, headers=None, data=None):
         headers["session"] = base64.b64encode(encrypted_session_token).decode()
 
     # Step 4: Make the request with the encrypted payload
-    response = requests.post(url, headers=headers, json={"payload": base64.b64encode(encrypted_params).decode()})
+    if json:
+        payload_conf = {"json": {"payload": base64.b64encode(encrypted_params).decode()}}
+    else:
+        payload_conf = {"data": {"payload": base64.b64encode(encrypted_params).decode()}}
+
+    response = requests.post(
+        url, 
+        headers=headers,
+        **payload_conf,
+        files=files
+    )
 
     # Step 5: Process the response
-    if not response.ok:
-        raise Exception(f"Request failed: {response.status_code} - {response.text}")
-
+    
     # Extract encrypted response
     encrypted_response = base64.b64decode(response.json()["ciphertext"])
     response_iv = base64.b64decode(response.json()["iv"])

@@ -39,8 +39,12 @@ def secure_endpoint():
                 # Step 1: Extract encrypted payload and headers
                 if request.method == 'GET':
                     payload = base64.b64decode(request.args.get("payload", ""))
-                else:
+                elif request.content_type == 'application/json':
                     payload = base64.b64decode(request.get_json().get("payload", ""))
+                elif request.content_type.startswith('multipart/form-data'):
+                    payload = base64.b64decode(request.form.get("payload", ""))
+                else:
+                    return jsonify({"error": "Unsupported Media Type"}), 415
 
                 iv = base64.b64decode(request.headers.get("X-Encrypted-IV", ""))
                 received_hmac = base64.b64decode(request.headers.get("X-HMAC", ""))
@@ -57,7 +61,9 @@ def secure_endpoint():
                     decrypted_session_token = decrypt_message(encrypted_session_bytes, SHARED_SECRET_KEY, iv).decode()
                 
                 # Parse parameters into the request context
-                if request.method == 'GET':
+                if not decrypted_params:
+                    pass
+                elif request.method == 'GET':
                     request.decrypted_params = dict(
                         param.split("=") for param in decrypted_params.split("&")
                     )
@@ -66,14 +72,17 @@ def secure_endpoint():
 
                 if encrypted_session_token:
                     request.decrypted_headers = {**request.headers, "session": decrypted_session_token}
-                    
+
                 # Step 4: Execute the original function
                 response_message, code = func(*args, **kwargs)
                 response_message: Response
 
                 # Step 5: Encrypt the response
+                if response_message.direct_passthrough:
+                    return response_message, code
+
                 response_iv = os.urandom(16)
-                encrypted_response = encrypt_message(response_message.data.decode(), SHARED_SECRET_KEY, response_iv)
+                encrypted_response = encrypt_message(response_message.get_data().decode(), SHARED_SECRET_KEY, response_iv)
                 response_hmac = create_hmac(encrypted_response, SHARED_SECRET_KEY)
 
                 return jsonify({
@@ -83,6 +92,7 @@ def secure_endpoint():
                 }), code
 
             except Exception as e:
+                print(e.with_traceback())
                 return jsonify({"error": "Invalid request", "message": str(e)}), 400
 
         return wrapper

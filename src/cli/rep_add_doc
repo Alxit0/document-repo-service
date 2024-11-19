@@ -7,6 +7,7 @@ import random
 import hashlib
 import base64
 import requests
+import secure_requests
 from file_encryption import encrypt_file, VALID_ALGOS_MODES_COMBOS
 
 import utils
@@ -55,7 +56,7 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
     }
     
     # Send the request to upload the encrypted file
-    response = requests.post(
+    response = secure_requests.secure_post(
         f"http://{utils.state['REP_ADDRESS']}/file/upload",
         data=data,
         files=files,
