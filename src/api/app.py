@@ -444,9 +444,93 @@ def get_doc_metadata():
 #subject endpoints
 @app.route("/subject/add", methods=['POST'])
 @verify_session()
-@verify_args()
+@verify_args(["username","name","email"])
 def add_subject():
     pass
+
+
+@app.route("subject/suspend", method=["PUT"])
+@verify_session()
+@verify_args(["username"])
+def suspend_subject():
+
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    data = request.get_json()
+    username = data['username']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT id FROM subjects
+            WHERE username = ?
+        """, (username,))
+        subject = cur.fetchone()
+
+        if not subject:
+            return jsonify({"error": "Subject not found"}), 404
+        
+        subject_id = subject[0]
+
+        cur.execute("""
+            UPDATE sub_org
+            SET status = ?
+            WHERE sub = ? AND org = ?
+            """,(False, subject_id, org_id))
+
+        db.commit()
+        return jsonify({"status": "success", "message": f"Subject {username} has been suspended."}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+@app.route("subject/activate", method=["PUT"])
+@verify_session()
+@verify_args(["username"])
+def activate_subject():
+
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    data = request.get_json()
+    username = data['username']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT id FROM subjects
+            WHERE username = ?
+        """, (username,))
+        subject = cur.fetchone()
+
+        if not subject:
+            return jsonify({"error": "Subject not found"}), 404
+        
+        subject_id = subject[0]
+
+        cur.execute("""
+            UPDATE sub_org
+            SET status = ?
+            WHERE sub = ? AND org = ?
+            """,(True, subject_id, org_id))
+
+        db.commit()
+        return jsonify({"status": "success", "message": f"Subject {username} has been activated."}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,13 +1,35 @@
 #!/usr/bin/env python
 
 import click
+import requests
 
 import utils
 from utils import default_command, logger
+
+@default_command
 @click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
 @click.argument('usename',required=True, type=str)
-def rep_activate_subject():
-    pass
+def rep_activate_subject(session_file: str, username: str):
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+    headers = {
+            "session": session
+    }
+    data = {
+        "username": username
+    }
+
+    response = requests.put(
+        f"http://{utils.state['REP_ADDRESS']}/subject/activate",
+        json=data,
+        headers=headers
+    )
+
+    if response.status_code == 200:
+        print(f"Subject '{username}' reactivated successfully.")
+    else:
+        print(f"Failed to reactivate subject '{username}':", response.text)
 
 if __name__ == '__main__':
     rep_activate_subject()
