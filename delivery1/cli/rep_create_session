@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+
+import click
+import json
+import base64
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+
+import secure_requests
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('organization', required=True, type=str)
+@click.argument('username', required=True, type=str)
+@click.argument('password', required=True, type=str)
+@click.argument('cred_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('session_file', required=True, type=click.Path(dir_okay=False))
+def rep_create_session(organization: str, username: str, password: str, cred_file: str, session_file: str):
+    
+    # get challenge
+    params = {"username": username}
+    res = secure_requests.secure_get(f"http://{utils.state['REP_ADDRESS']}/session/challenge", params=params)
+
+    logger.debug(res)
+    if res.status_code != 200:
+        logger.info(json.loads(res.content))
+        return
+
+    nonce = json.loads(res.content)['nounce']
+
+    # Load and decrypt the private key
+    with open(cred_file, 'r') as file:
+        keys = json.load(file)
+    
+    try:
+        private_key = serialization.load_pem_private_key(
+            keys['REP_PRIV_KEY'].encode('utf-8'),
+            password=password.encode()
+        )
+    except ValueError:
+        logger.info("Wrong password.")
+        return
+
+    # sign the nonce
+    signature = private_key.sign(
+        base64.b64decode(nonce),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+    # get session thorugh challenge
+    payload = {
+        "organization": organization,
+        "username": username,
+        "password": password,
+        "signature": base64.b64encode(signature).decode()
+    }
+
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/session/create", json=payload)
+    logger.debug(res)
+    logger.info(res.content.decode())
+    
+    if res.status_code != 200:
+        return
+    
+    data = json.loads(res.content)
+
+    with open(session_file, "+w") as file:
+        file.write(data['session_token'])
+
+    return
+
+if __name__ == '__main__':
+    rep_create_session()

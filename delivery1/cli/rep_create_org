@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+import json
+import click
+
+import secure_requests
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('organization', required=True, type=str)
+@click.argument('username', required=True, type=str)
+@click.argument('name', required=True, type=str)
+@click.argument('email', required=True, type=str)
+@click.argument('pub_key_file', required=True, type=click.Path(exists=True, dir_okay=False))
+def rep_create_org(organization: str, username: str, name: str, email: str, pub_key_file: str):
+    
+    # Load and decrypt the private key
+    with open(pub_key_file, 'r') as file:
+        keys = json.load(file)
+    public_key = keys['REP_PUB_KEY']
+    
+    body = {
+        "organization": organization,
+        "username": username,
+        "name": name,
+        "email": email,
+        "public_key": public_key
+    }
+
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
+    logger.debug(res)
+    logger.info(res.content.decode())
+    
+    return
+
+
+if __name__ == '__main__':
+    rep_create_org()
