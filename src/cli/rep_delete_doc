@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+import json
+import click
+import secure_requests
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('document_name',required=True, type=str)
+def rep_delete_doc(session_file:str, document_name:str):
+    
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+    
+    headers = {
+        "session": session
+    }
+
+    body = {
+        'document_name': document_name
+    }
+
+    res = secure_requests.secure_put(f"http://{utils.state['REP_ADDRESS']}/file/delete", headers=headers, json=body)
+
+    logger.info(json.loads(res.content))
+
+
+if __name__ == '__main__':
+    rep_delete_doc()

@@ -25,15 +25,17 @@ CREATE TABLE subjects (
 CREATE TABLE documents (    
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-    handle TEXT NOT NULL UNIQUE,   -- identifier for the document
+    handle TEXT UNIQUE,   -- identifier for the document
     name TEXT NOT NULL UNIQUE,
 
     organization_id INTEGER,
     created_by INTEGER,            -- subject id of creator
+    deleted_by INTEGER DEFAULT NULL,            -- subject id of deleter
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (organization_id) REFERENCES organizations(id),
     FOREIGN KEY (created_by) REFERENCES subjects(id)
+    FOREIGN KEY (deleted_by) REFERENCES subjects(id)
 );
 
 CREATE TABLE document_metadata (

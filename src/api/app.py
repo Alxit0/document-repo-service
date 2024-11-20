@@ -367,12 +367,15 @@ def list_docs():
         SELECT
             documents.handle AS doc_handle,
             documents.name AS doc_name,
-            subjects.username AS sub_name,
+            created_by_user.username AS created_by_username,
+            deleted_by_user.username AS deleted_by_username,
             documents.created_at AS doc_created_at
         FROM
             documents
         JOIN
-            subjects ON documents.created_by = subjects.id
+            subjects AS created_by_user ON documents.created_by = created_by_user.id
+        LEFT JOIN
+            subjects AS deleted_by_user ON documents.deleted_by = deleted_by_user.id
         WHERE
             documents.organization_id = ?
     """
@@ -408,16 +411,11 @@ def list_docs():
         cur.execute(query, params)
         docs = cur.fetchall()
 
+        fields = ["handle", "name", "created_by", "deleted_by", "created_at"]
         doc_list = [
-            {
-                "name": doc[1],
-                "handle": doc[0],
-                "created_by": doc[2],
-                "created_at": doc[3]
-            }
-            for doc in docs
+            {i: j for i, j in zip(fields, doc) if j} for doc in docs
         ]
-
+        
         return jsonify({"status": "success", "documents": doc_list}), 200
     
     except Exception as e:
@@ -502,6 +500,53 @@ def get_doc_metadata():
     except Exception as e:
         db.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@app.route("/file/delete", methods=['PUT'])
+@secure_endpoint()
+@verify_session()
+@verify_args(["document_name"])
+def delete_file():
+
+    doc_name = request.decrypted_params.get("document_name")
+
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org_id = session_data['org']
+    usr_id = session_data['usr']
+    
+    db = get_db()
+    cur = db.cursor()
+    
+    try:
+        # ensure the doc exists and belongs to the user's org
+        cur.execute("""
+            SELECT id, handle FROM documents
+            WHERE name = ? AND organization_id = ? AND deleted_by IS NULL
+        """, (doc_name, org_id))
+        document = cur.fetchone()
+
+        if not document:
+            return jsonify({"error": "Document not found or already deleted"}), 404
+
+        doc_id, handle = document
+
+        # update the deleted_by column to indicate soft deletion
+        cur.execute("""
+            UPDATE documents
+            SET deleted_by = ?, handle = NULL
+            WHERE id = ?
+        """, (usr_id, doc_id))
+
+        # Commit the transaction
+        db.commit()
+
+        return jsonify({"status": "success", "handle": handle}), 200
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
     finally:
         cur.close()
 
