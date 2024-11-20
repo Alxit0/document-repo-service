@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import click
 import requests
 
@@ -15,11 +16,10 @@ from utils import default_command, logger
 @click.argument('pub_key_file', required=True, type=click.Path(exists=True, dir_okay=False))
 def rep_create_org(organization: str, username: str, name: str, email: str, pub_key_file: str):
     
-    # read public key
+    # Load and decrypt the private key
     with open(pub_key_file, 'r') as file:
-        #public_key = file.read()
-        credentials = json.load(file)
-        public_key = credentials.get('REP_PUB_KEY')
+        keys = json.load(file)
+    public_key = keys['REP_PUB_KEY']
     
     body = {
         "organization": organization,

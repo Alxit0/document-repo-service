@@ -39,7 +39,6 @@ def initialize_db():
     
     # Run schema SQL if the table doesn't exist
     with current_app.open_resource(SCHEMA, mode='r') as f:
-        print("ola")
         db.executescript(f.read())
 
     db.commit()
