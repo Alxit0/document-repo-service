@@ -59,12 +59,10 @@ def encrypt_file(file_path: str, algo='AES', mode='CBC'):
 
     return ct, key, iv, nonce
 
-def decrypt_file(key, iv, nonce, file_path: str, algo='AES', mode='CBC'):
+def decrypt_file(key, iv, nonce, file_path: bytes, algo='AES', mode='CBC'):
     
+    ct = file_path
 
-    with open(file_path, "rb") as file:
-        ct = file.read()
-    
     # decrypt
     cipher = Cipher(ALGOS[algo](key,nonce), MODES[mode](iv))
     decryptor = cipher.decryptor()
@@ -75,8 +73,7 @@ def decrypt_file(key, iv, nonce, file_path: str, algo='AES', mode='CBC'):
     data = unpadder.update(text)
     data += unpadder.finalize()
 
-    with open(file_path, "wb") as file:
-        file.write(data)
+    return data
 
 def main():
     """To generate all the valid combinations of algo/modes"""

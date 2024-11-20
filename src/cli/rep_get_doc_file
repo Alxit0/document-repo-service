@@ -2,6 +2,7 @@
 
 import base64
 import json
+import os
 import click
 
 from file_encryption import decrypt_file
@@ -27,7 +28,7 @@ def rep_get_file(session_file: str, document_name: str, file: str):
 
     if response.status_code != 200:
         logger.info("Failed to download metadata")
-        print(response.content)
+        logger.info(json.loads(response.content))
         return
 
     doc_metadata = json.loads(response.content)['metadata']
@@ -41,13 +42,12 @@ def rep_get_file(session_file: str, document_name: str, file: str):
 
     if response.status_code != 201:
         logger.info("Failed to download metadata")
-        print(response.content)
+        logger.info(json.loads(response.content))
         return
 
-    with open(file, "wb+") as fp:
-        fp.write(response.content)
+    # save file temporary
+    file_content = response.content
     logger.info("File downloaded")
-
     
     # decrypt file
     key = base64.b64decode(doc_metadata['encryption_key'])
@@ -55,9 +55,17 @@ def rep_get_file(session_file: str, document_name: str, file: str):
     nonce = base64.b64decode(doc_metadata['nonce'])
 
     algo, mode = doc_metadata['algorithm'].split('-')
-    decrypt_file(key, iv, nonce, file, algo, mode)
+    fp_decrypted = decrypt_file(key, iv, nonce, file_content, algo, mode)
 
     logger.info("File downloaded and decrypted sucesfully")
+
+    # output to the command line
+    if not file:
+        print(fp_decrypted.decode())
+        return
+    
+    with open(file, "wb+") as fp:
+        fp.write(fp_decrypted)
     
 
 if __name__ == '__main__':
