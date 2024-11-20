@@ -5,15 +5,24 @@ CREATE TABLE organizations (
     FOREIGN KEY (created_by) REFERENCES subjects(id)
 );
 
-CREATE TABLE subjects (
+CREATE TABLE subjects ( 
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
     username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL UNIQUE,
+
     full_name TEXT,
-    public_key TEXT
+    public_key TEXT,
+    
+    org INTEGER,
+
+    status boolean DEFAULT True,               -- True = active, False = dead inside
+    FOREIGN KEY (org) REFERENCES organizations(id),
+    UNIQUE (org, username)
+    UNIQUE (org, email)
 );
 
-CREATE TABLE documents (
+CREATE TABLE documents (    
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     handle TEXT NOT NULL UNIQUE,   -- identifier for the document

@@ -165,3 +165,6 @@ temp*
 *.pem
 docs_repo/
 */cli/metadatas/
+*.ses
+*.creds
+docs_repo/
