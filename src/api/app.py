@@ -588,7 +588,7 @@ def add_subject():
     
     return jsonify({"status": "success", "client id": client_id}), 200
 
-@app.route("/subject/add", methods=['POST'])
+@app.route("/subject/list", methods=['GET'])
 @secure_endpoint()
 @verify_session()
 @verify_args([])
@@ -624,8 +624,8 @@ def list_subjects():
         subjects = [
             {
                 "username": row[0],
-                "full_name": row[1],
-                "email": row[2],
+                "email": row[1],
+                "name": row[2],
                 "status": "active" if row[3] else "suspended"
             }
             for row in results
