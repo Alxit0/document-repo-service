@@ -75,6 +75,9 @@ def decrypt_file(key, iv, nonce, file_path: str, algo='AES', mode='CBC'):
     data = unpadder.update(text)
     data += unpadder.finalize()
 
+    with open(file_path, "wb") as file:
+        file.write(data)
+
 def main():
     """To generate all the valid combinations of algo/modes"""
     

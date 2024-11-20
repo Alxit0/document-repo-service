@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import requests
 import json
 import click
@@ -37,6 +38,11 @@ def rep_get_doc_metadata(session_file: str, document_name: str):
     logger.info(f"Metadata for document '{document_name}':")
     print(json.dumps(doc_metadata, indent=4))
 
+    # save to file
+    os.makedirs("./metadatas")
+    out_path = os.path.join("./metadatas", f"{document_name}_meta.json")
+    with open(out_path, "w+") as file:
+        json.dump(doc_metadata, file)
 
 
 if __name__ == '__main__':

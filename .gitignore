@@ -164,3 +164,4 @@ temp*
 *.db
 *.pem
 docs_repo/
+*/cli/metadatas/
