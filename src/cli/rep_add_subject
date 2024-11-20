@@ -1,25 +1,43 @@
 #!/usr/bin/env python
 
+import json
 import click
+import requests
 
 import utils
 from utils import default_command, logger
 
 @default_command
 @click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
-@click.argument('usename',required=True, type=str)
+@click.argument('username',required=True, type=str)
 @click.argument('name',required=True, type=str)
 @click.argument('email', required=True, type=str)
 @click.argument('cred_file', required=True, type=click.Path(exists=True, dir_okay=False))
 def rep_add_subject(session_file:str, username:str, name:str, email:str, cred_file:str):
+    
     with open(session_file, 'r') as f:
         session = f.read().strip()
 
+    # Load and decrypt the private key
+    with open(cred_file, 'r') as file:
+        keys = json.load(file)
+    public_key = keys['REP_PUB_KEY']
+
     headers = {
-            "session": session
+        "session": session
+    }
+
+    body = {
+        "username": username,
+        "name": name,
+        "email": email,
+        "public_key": public_key
     }
     
-    pass
+    res = requests.post(f"http://{utils.state['REP_ADDRESS']}/subject/add", headers=headers, json=body)
+
+    print(res.content)    
+
 
 if __name__ == '__main__':
     rep_add_subject()

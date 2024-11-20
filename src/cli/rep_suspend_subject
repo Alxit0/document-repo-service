@@ -27,7 +27,7 @@ def rep_suspend_subject(session_file: str, username: str):
     )
 
     if response.status_code == 200:
-        print(f"Subject '{username}' reactivated successfully.")
+        print(f"Subject '{username}' suspended successfully.")
     else:
         print(f"Failed to reactivate subject '{username}':", response.text)
 

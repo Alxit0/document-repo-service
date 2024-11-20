@@ -122,19 +122,30 @@ def org_create():
     public_key = data['public_key']
 
     try:
+        # create org
+        cur.execute("INSERT INTO organizations (name) VALUES (?);", (organization,))
+        org_id = cur.lastrowid
+
         # get user id
         cur.execute("SELECT id FROM subjects WHERE username=?", (username,))
         user_id = cur.fetchone()
 
         # check if user exists
         if user_id is None:
-            cur.execute("INSERT INTO subjects (username, full_name, email, public_key) VALUES (?, ?, ?, ?);", (username, name, email, public_key))
+            cur.execute("""
+                INSERT INTO 
+                    subjects (username, full_name, email, public_key, org) 
+                VALUES 
+                    (?, ?, ?, ?, ?);"""
+                , (username, name, email, public_key, org_id)
+            )
             user_id = cur.lastrowid
         else:
             user_id = user_id[0]
 
-        # create the organization
-        cur.execute("INSERT INTO organizations (name, created_by) VALUES (?, ?);", (organization, user_id))
+        # update organization
+        cur.execute("UPDATE organizations SET created_by = ? WHERE id = ?;", (user_id, org_id))
+        
         db.commit()
 
         return jsonify({"id": cur.lastrowid, "organization": organization, "created_by": user_id}), 201
@@ -183,17 +194,23 @@ def authenticate():
     username: str = data["username"]
     organization_name: str = data["organization"]
     signature: str = data["signature"]
-    
+
+    # Get organization
+    cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
+    org_id = cur.fetchone()
+    if not org_id:
+        return jsonify({"error": "Organization not found"}), 404
+    org_id = org_id[0]
+
     # Retrieve the stored public key for the username
-    cur.execute("SELECT public_key, id FROM subjects WHERE username == ?", (username,))
+    cur.execute("SELECT public_key, id FROM subjects WHERE username == ? AND org == ?", (username, org_id))
     res:str = cur.fetchone()
     
     if res is None:
-        return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "User not found within organization"}), 404
 
     stored_public_key_bytes = res[0]
     user_id = res[1]
-
 
     # Verify the identity
     is_verified = verify_signature(
@@ -205,19 +222,12 @@ def authenticate():
     if not is_verified:
         return jsonify({"message": "Authentication failed. Incorrect password or private key."}), 401
 
-    # Get organization
-    cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
-    org_id = cur.fetchone()
-    if not org_id:
-        return jsonify({"error": "Organization not found"}), 404
-    org_id = org_id[0]
-
     # Return result
     token_info = {
         'org': org_id,
         'usr': user_id
     }
-    print(token_info)
+
     return jsonify({"message": "Authentication successful", "session_token": write_token(token_info)}), 200
 
 
@@ -384,6 +394,7 @@ def get_file(file_handle: str):
 def ping():
     return json.dumps({"status": "up"})
 
+
 @app.route("/file/metadata", methods=['GET'])
 @verify_session()
 @verify_args(["document_name"])
@@ -444,7 +455,7 @@ def get_doc_metadata():
 #subject endpoints
 @app.route("/subject/add", methods=['POST'])
 @verify_session()
-@verify_args(["username","name","email"])
+@verify_args(["username", "name", "email", 'public_key'])
 def add_subject():
     session_data = extrat_token_info(request.headers['session'])
     org_id = session_data['org']
@@ -453,52 +464,58 @@ def add_subject():
     username = data["username"]
     name = data["name"]
     email = data["email"]
+    public_key = data['public_key']
 
     db = get_db()
     cur = db.cursor()
 
     try:
-        #pain i want to leave my mortal shell
-        pass
+        cur.execute("""
+            INSERT INTO 
+                subjects (username, full_name, email, public_key, org) 
+            VALUES (?, ?, ?, ?, ?);
+        """, (username, name, email, public_key, org_id))
+        client_id = cur.lastrowid
+
+        db.commit()
 
     except Exception as e:
         db.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
     finally:
         cur.close()
+    
+    return jsonify({"status": "success", "client id": client_id})
 
 @app.route("/subject/add", methods=['POST'])
 @verify_session()
 @verify_args([])
 def list_subjects():
     session_data = extrat_token_info(request.headers['session'])
+    
     org_id = session_data['org']
-
     username = request.args.get("username", None)
 
     db = get_db()
     cur = db.cursor()
 
-    try:
-        query = """
+    query = """
             SELECT
-                s.username,
-                s.email,
-                s.full_name,
-                s.status
+                username, email, full_name, status
             FROM
-                subjects s
-            JOIN
-                sub_org so ON s.id = so.sub
+                subjects
             WHERE
-                so.org = ?
-        """
-        params = [org_id]
+                org = ?
+    """
+    params = [org_id]
 
-        # if you give a username
-        if username:
-            query += "AND s.username = ?"
-            params.append(username)
+    # if you give a username
+    if username:
+        query += " AND s.username = ?"
+        params.append(username)
+
+    try:
 
         cur.execute(query, params)
         results = cur.fetchall()
@@ -513,27 +530,28 @@ def list_subjects():
             for row in results
         ]
 
-        if not subjects:
-            message = "No subjects found."
-            if username:
-                message = f"Subject '{username}' not found."
-            return jsonify({
-                "status": "success",
-                "message": message,
-                "subjects": []
-            }), 404  #404 or 200 here?
+        # send result
         
-        return jsonify({"status": "success", "subjects": subjects}), 200
+        if subjects:
+            return jsonify({"status": "success", "subjects": subjects}), 200
 
+
+        if username:
+            message = f"Subject '{username}' not found."
+        else:
+            message = "No subjects found."
+
+        return jsonify({"error": message}), 400
+        
     except Exception as e:
         db.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
     finally:
         cur.close()
 
 
-
-@app.route("subject/suspend", method=["PUT"])
+@app.route("/subject/suspend", methods=["PUT"])
 @verify_session()
 @verify_args(["username"])
 def suspend_subject():
@@ -548,22 +566,12 @@ def suspend_subject():
     cur = db.cursor()
 
     try:
-        cur.execute("""
-            SELECT id FROM subjects
-            WHERE username = ?
-        """, (username,))
-        subject = cur.fetchone()
-
-        if not subject:
-            return jsonify({"error": "Subject not found"}), 404
-        
-        subject_id = subject[0]
 
         cur.execute("""
-            UPDATE sub_org
+            UPDATE subjects
             SET status = ?
-            WHERE sub = ? AND org = ?
-            """,(False, subject_id, org_id))
+            WHERE username = ? AND org = ?
+        """,(False, username, org_id))
 
         db.commit()
         return jsonify({"status": "success", "message": f"Subject {username} has been suspended."}), 200
@@ -571,11 +579,12 @@ def suspend_subject():
     except Exception as e:
         db.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
     finally:
         cur.close()
 
 
-@app.route("subject/activate", method=["PUT"])
+@app.route("/subject/activate", methods=["PUT"])
 @verify_session()
 @verify_args(["username"])
 def activate_subject():
@@ -590,22 +599,12 @@ def activate_subject():
     cur = db.cursor()
 
     try:
-        cur.execute("""
-            SELECT id FROM subjects
-            WHERE username = ?
-        """, (username,))
-        subject = cur.fetchone()
-
-        if not subject:
-            return jsonify({"error": "Subject not found"}), 404
-        
-        subject_id = subject[0]
 
         cur.execute("""
-            UPDATE sub_org
+            UPDATE subjects
             SET status = ?
-            WHERE sub = ? AND org = ?
-            """,(True, subject_id, org_id))
+            WHERE username = ? AND org = ?
+            """,(True, username, org_id))
 
         db.commit()
         return jsonify({"status": "success", "message": f"Subject {username} has been activated."}), 200
@@ -615,6 +614,7 @@ def activate_subject():
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
     finally:
         cur.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)

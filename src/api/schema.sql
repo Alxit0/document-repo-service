@@ -7,20 +7,20 @@ CREATE TABLE organizations (
 
 CREATE TABLE subjects ( 
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
     username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL UNIQUE,
-    full_name TEXT,
-    public_key TEXT
-);
 
-CREATE TABLE sub_org (
-    sub INTEGER,
+    full_name TEXT,
+    public_key TEXT,
+    
     org INTEGER,
-    status boolean,               -- True = active, False = dead inside
-    FOREIGN KEY (sub) REFERENCES subjects(id),
+
+    status boolean DEFAULT True,               -- True = active, False = dead inside
     FOREIGN KEY (org) REFERENCES organizations(id),
-    UNIQUE (sub,org)
-)
+    UNIQUE (org, username)
+    UNIQUE (org, email)
+);
 
 CREATE TABLE documents (    
     id INTEGER PRIMARY KEY AUTOINCREMENT,
