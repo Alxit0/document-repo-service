@@ -346,11 +346,11 @@ fi
 
 echo " "
 echo "======================================================"
-echo "|                 List Subjects                      |-----------------------------------------------"
+echo "|                 List Subjects                      |
 echo "======================================================"
 
 # get file and Download it
-#./rep_list_subjects "$SESSION_FILE_LOL"
+./rep_list_subjects "$SESSION_FILE_LOL"
 if [ $? -ne 0 ]
 then
     echo "Error: Failed to get Subjects list !!!"
