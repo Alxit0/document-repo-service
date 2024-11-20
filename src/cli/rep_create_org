@@ -30,7 +30,8 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
     logger.debug(res)
     logger.info(res.content.decode())
-    exit(0)
+    
+    return
 
 
 if __name__ == '__main__':

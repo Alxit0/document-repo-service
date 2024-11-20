@@ -1,11 +1,12 @@
 import base64
+from cryptography.hazmat.primitives import serialization, hashes
 from datetime import datetime
 from functools import wraps
 import os
 from flask import Flask, jsonify, request, send_file
 import json
 
-from secure_communication import secure_endpoint
+from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
 from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
@@ -24,8 +25,12 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            data = request.decrypted_params
-            
+            try:
+                data = request.decrypted_params
+            except:
+                request.decrypted_params = get_right_body()
+                data = request.decrypted_params
+
             # Validate required fields
             needed_fields = []
             for field in required_fields:
@@ -67,7 +72,49 @@ def verify_session():
     return decorator
 
 
-# endpoints
+# secure comunication setup
+@app.route('/get-parameters', methods=['GET'])
+def get_parameters():
+    data = parameters.parameter_bytes(encoding=serialization.Encoding.PEM, format=serialization.ParameterFormat.PKCS3)
+    
+    return jsonify({"parameters": base64.b64encode(data).decode()}), 200
+
+@app.route('/dh-init', methods=['POST'])
+@verify_args(["client_id", "client_public_key"])
+def dh_init():
+
+    data = request.json
+    client_id = data["client_id"]
+    client_public_key_bytes = base64.b64decode(data["client_public_key"])
+
+    # deserialize client's public key
+    client_public_key = serialization.load_pem_public_key(client_public_key_bytes)
+
+    # gen server's private/public key pair
+    server_private_key = parameters.generate_private_key()
+    server_public_key = server_private_key.public_key()
+
+    # compute shared secret
+    shared_secret = server_private_key.exchange(client_public_key)
+    
+    # Serialize server's public key
+    server_public_key_bytes = server_public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(shared_secret)
+    valid_key = digest.finalize()  # 256-bit (32 bytes) key
+
+    client_shared_keys[client_id] = valid_key
+
+    return jsonify({
+        "server_public_key": base64.b64encode(server_public_key_bytes).decode()
+    }), 200
+
+
+# repo endpoints
 @app.route("/organization/list")
 @secure_endpoint()
 def org_list():

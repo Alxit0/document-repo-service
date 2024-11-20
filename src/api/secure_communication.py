@@ -1,14 +1,36 @@
 from functools import wraps
 import json
 from flask import Response, request, jsonify
+from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import hashes, hmac
+from cryptography.hazmat.primitives import hashes, hmac, serialization
+from cryptography.hazmat.primitives.serialization import load_pem_parameters
 import base64
 import os
 
 # Shared secret key for encryption and HMAC
-SHARED_SECRET_KEY = b'\xe4\xe1\x9d\xef\xcc\xc8\xf7\x1f5p\xda\x83\xe4\xc1W\x06\xbdQgH\xe7\xda\xd0\xd5c\x13D\x0f\xee$fG'
+PARAMETERS_FILE = "./dh_parameters.pem"
+client_shared_keys = {} # Store client-specific shared keys (keyed by client_id)
 
+def load_or_generate_parameters():
+    if os.path.exists(PARAMETERS_FILE):
+    
+        with open(PARAMETERS_FILE, "rb") as file:
+            parameters_pem = file.read()
+        return load_pem_parameters(parameters_pem)
+    
+    else:
+        # Generate new DH parameters
+        print("Generating parameters (may take a while)")
+        parameters = dh.generate_parameters(generator=2, key_size=2048)
+        with open(PARAMETERS_FILE, "wb") as file:
+            file.write(parameters.parameter_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.ParameterFormat.PKCS3
+            ))
+        return parameters
+
+parameters = load_or_generate_parameters()
 
 def get_right_body():
     body: dict = None
@@ -22,7 +44,7 @@ def get_right_body():
 
     return body
 
-# Helper functions for encryption, decryption, HMAC, etc.
+# helper functions for encryption, decryption, HMAC, etc.
 def decrypt_message(ciphertext, key, iv):
     if not ciphertext:
         return b"{}"
@@ -47,12 +69,13 @@ def verify_hmac(data, key, hmac_to_verify):
     h.update(data)
     h.verify(hmac_to_verify)
 
-# The secure decorator
+# secure decorator
 def secure_endpoint():
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             try:
+
                 body = get_right_body()
 
                 # extract encrypted payload and headers
@@ -60,16 +83,23 @@ def secure_endpoint():
                 iv = base64.b64decode(request.headers.get("X-Encrypted-IV", ""))
                 received_hmac = base64.b64decode(request.headers.get("X-HMAC", ""))
                 encrypted_session_token = request.headers.get("Session", "")
+                client_id = request.headers.get("Client-Id", "")
 
+                if client_id not in client_shared_keys:
+                    return jsonify({"error": "Need to regnociate secret_key"}), 101
+
+                shared_secret_key = client_shared_keys[client_id]
+
+                print(shared_secret_key.hex())
                 # verify the HMAC
-                verify_hmac(payload, SHARED_SECRET_KEY, received_hmac)
+                verify_hmac(payload, shared_secret_key, received_hmac)
 
                 # decrypt the payload and nessessary headers
-                decrypted_params = decrypt_message(payload, SHARED_SECRET_KEY, iv).decode()
+                decrypted_params = decrypt_message(payload, shared_secret_key, iv).decode()
                 request.decrypted_params = json.loads(decrypted_params)
 
                 encrypted_session_bytes = base64.b64decode(encrypted_session_token)
-                decrypted_session_token = decrypt_message(encrypted_session_bytes, SHARED_SECRET_KEY, iv).decode()
+                decrypted_session_token = decrypt_message(encrypted_session_bytes, shared_secret_key, iv).decode()
                 request.decrypted_headers = {**request.headers, "session": decrypted_session_token}
 
                 
@@ -83,8 +113,8 @@ def secure_endpoint():
                     return response_message, code
 
                 response_iv = os.urandom(16)
-                encrypted_response = encrypt_message(response_message.get_data().decode(), SHARED_SECRET_KEY, response_iv)
-                response_hmac = create_hmac(encrypted_response, SHARED_SECRET_KEY)
+                encrypted_response = encrypt_message(response_message.get_data().decode(), shared_secret_key, response_iv)
+                response_hmac = create_hmac(encrypted_response, shared_secret_key)
 
                 return jsonify({
                     "iv": base64.b64encode(response_iv).decode(),

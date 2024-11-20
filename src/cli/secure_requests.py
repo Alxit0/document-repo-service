@@ -1,15 +1,84 @@
 import json as json_lib
 from typing import Literal
+import uuid
 import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import hashes, hmac
+from cryptography.hazmat.primitives import hashes, hmac, serialization
 import base64
 import os
+import utils
 
 # Shared secret key for encryption and HMAC
-SHARED_SECRET_KEY = b'\xe4\xe1\x9d\xef\xcc\xc8\xf7\x1f5p\xda\x83\xe4\xc1W\x06\xbdQgH\xe7\xda\xd0\xd5c\x13D\x0f\xee$fG'  # 32 bytes for AES-256
+SHARED_SECRET_KEY = None  # 32 bytes for AES-256
 
 
+# Diffie-Hellman exchange
+def fetch_server_parameters():
+    print("Negociating key ... ")
+    response = requests.get(f"http://{utils.state['REP_ADDRESS']}/get-parameters")
+   
+    if response.status_code != 200:
+        raise Exception("Failed to fetch DH parameters.")
+   
+    parameters_pem = base64.b64decode(response.json()["parameters"])
+    
+    return serialization.load_pem_parameters(parameters_pem)
+
+def initiate_dh_key_exchange():
+
+    parameters = fetch_server_parameters()
+    
+    private_key = parameters.generate_private_key()
+    public_key = private_key.public_key()
+    
+    public_key_bytes = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    # gen client id
+    if 'client_id' not in utils.state:
+        utils.state['client_id'] = str(uuid.uuid4())
+    client_id = utils.state['client_id']
+    
+    # send the client's public key and ID to the server
+    response = requests.post(
+        f"http://{utils.state['REP_ADDRESS']}/dh-init",
+        json={
+            "client_id": client_id,
+            "client_public_key": base64.b64encode(public_key_bytes).decode()
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"Key exchange failed: {response.json()}")
+
+    # parse the server's public key from the response
+    server_public_key_bytes = base64.b64decode(response.json()["server_public_key"])
+    server_public_key = serialization.load_pem_public_key(server_public_key_bytes)
+
+    # Compute the shared secret
+    shared_secret = private_key.exchange(server_public_key)
+
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(shared_secret)
+    valid_key = digest.finalize()  # 256-bit (32 bytes) key
+    print(valid_key.hex())
+
+    return valid_key
+
+def check_secure_key(force=False):
+    global SHARED_SECRET_KEY
+
+    if 'SHARED_SECRET_KEY' in utils.state and not force:
+        SHARED_SECRET_KEY = base64.b64decode(utils.state['SHARED_SECRET_KEY'])
+        return 
+    
+    SHARED_SECRET_KEY = initiate_dh_key_exchange()
+    utils.state['SHARED_SECRET_KEY'] = base64.b64encode(SHARED_SECRET_KEY).decode()
+
+
+# secure comunication
 def encrypt_message(message, key, iv):
     cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
     encryptor = cipher.encryptor()
@@ -49,6 +118,7 @@ def prepare_data(headers, data, mode: Literal["params", "json", "data"]):
     # add the IV and HMAC to headers
     headers = headers or {}
     headers.update({
+        "Client-Id": utils.state['client_id'],
         "X-Encrypted-IV": base64.b64encode(iv).decode(),
         "X-HMAC": base64.b64encode(hmac_value).decode()
     })
@@ -79,7 +149,8 @@ def prepare_response(response: requests.Response):
     return response
 
 
-def secure_get(url, headers=None, params=None):
+def secure_get(url, headers=None, params=None, *, _lvl=0):
+    check_secure_key()
     
     # encrypt data
     headers, body = prepare_data(headers, params, "params")
@@ -90,11 +161,17 @@ def secure_get(url, headers=None, params=None):
         headers=headers,
         **body
     )
+
+    # regnociar keys
+    if response.status_code == 101 and _lvl < 2:
+        check_secure_key(force=True)
+        return secure_get(url, headers, params, _lvl=_lvl+1)
     
     # decrypt response
     return prepare_response(response)
 
-def secure_post(url, headers=None, data=None, json=None, files=None):
+def secure_post(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
+    check_secure_key()
 
     # encrypt data
     if data:
@@ -111,6 +188,15 @@ def secure_post(url, headers=None, data=None, json=None, files=None):
         **body,
         files=files
     )
+
+    # status_code 201 to skip decryption
+    if response.status_code == 201:
+        return response
+    
+    # regnociar keys
+    if response.status_code == 101 and _lvl < 2:
+        check_secure_key(force=True)
+        return secure_post(url, headers, data, json, files, _lvl=_lvl+1)
 
     # decrypt response
     return prepare_response(response)
