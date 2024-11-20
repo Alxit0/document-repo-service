@@ -1,0 +1,46 @@
+import click
+import requests
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('username', required=False, type=str)
+def rep_list_subjects(session_file: str, username: str = None):
+
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+    headers = {
+        "session": session
+    }
+
+    params = {}
+    if username:
+        params['username'] = username
+    
+    response = requests.get(
+        f"http://{utils.state['REP_ADDRESS']}/subject/list",
+        headers=headers,
+        params=params
+    )
+
+    if response.status_code == 200:
+        subjects = response.json().get("subjects", [])
+        if not subjects:
+            if username:
+                print(f"No subject found with username '{username}'.")
+            else:
+                print("No subjects found for this organization.")
+        else:
+            for subject in subjects:
+                status = "Active" if subject['status'] else "Suspended"
+                print(f"Username: {subject['username']}, Name: {subject['name']}, Status: {status}")
+    else:
+        print(f"Failed to retrieve subjects: {response.status_code}, {response.text}")
+
+
+
+if __name__ == '__main__':
+    rep_list_subjects()

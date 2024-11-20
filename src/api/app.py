@@ -446,7 +446,91 @@ def get_doc_metadata():
 @verify_session()
 @verify_args(["username","name","email"])
 def add_subject():
-    pass
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    data = request.get_json()
+    username = data["username"]
+    name = data["name"]
+    email = data["email"]
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        #pain i want to leave my mortal shell
+        pass
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@app.route("/subject/add", methods=['POST'])
+@verify_session()
+@verify_args([])
+def list_subjects():
+    session_data = extrat_token_info(request.headers['session'])
+    org_id = session_data['org']
+
+    username = request.args.get("username", None)
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        query = """
+            SELECT
+                s.username,
+                s.email,
+                s.full_name,
+                s.status
+            FROM
+                subjects s
+            JOIN
+                sub_org so ON s.id = so.sub
+            WHERE
+                so.org = ?
+        """
+        params = [org_id]
+
+        # if you give a username
+        if username:
+            query += "AND s.username = ?"
+            params.append(username)
+
+        cur.execute(query, params)
+        results = cur.fetchall()
+
+        subjects = [
+            {
+                "username": row[0],
+                "full_name": row[1],
+                "email": row[2],
+                "status": "active" if row[3] else "suspended"
+            }
+            for row in results
+        ]
+
+        if not subjects:
+            message = "No subjects found."
+            if username:
+                message = f"Subject '{username}' not found."
+            return jsonify({
+                "status": "success",
+                "message": message,
+                "subjects": []
+            }), 404  #404 or 200 here?
+        
+        return jsonify({"status": "success", "subjects": subjects}), 200
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
 
 
 @app.route("subject/suspend", method=["PUT"])

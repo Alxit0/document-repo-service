@@ -8,7 +8,7 @@ from utils import default_command, logger
 
 @default_command
 @click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
-@click.argument('usename',required=True, type=str)
+@click.argument('username',required=True, type=str)
 def rep_suspend_subject(session_file: str, username: str):
     with open(session_file, 'r') as f:
         session = f.read().strip()
