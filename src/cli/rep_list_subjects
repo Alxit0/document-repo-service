@@ -1,5 +1,5 @@
 import click
-import requests
+import secure_requests
 
 import utils
 from utils import default_command, logger
@@ -20,7 +20,7 @@ def rep_list_subjects(session_file: str, username: str = None):
     if username:
         params['username'] = username
     
-    response = requests.get(
+    response = secure_requests.secure_get(
         f"http://{utils.state['REP_ADDRESS']}/subject/list",
         headers=headers,
         params=params

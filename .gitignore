@@ -162,6 +162,9 @@ cython_debug/
 # random stuff
 temp*
 *.db
+*.pem
+docs_repo/
+*/cli/metadatas/
 *.ses
 *.creds
 docs_repo/

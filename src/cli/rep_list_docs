@@ -3,8 +3,8 @@
 from datetime import datetime
 from pprint import pprint
 import click
-import requests
 
+import secure_requests
 import utils
 from utils import default_command, logger
 
@@ -45,12 +45,16 @@ def rep_list_docs(session_file, username, date):
     }
     params = {
         'username': username,
-        'date': filter_date,
-        'date_filter_type': date_filter_type
     }
 
+    if date:
+        params.update({
+            'date': filter_date,
+            'date_filter_type': date_filter_type
+        })
+
     # Send request to the list_docs endpoint
-    response = requests.get(f"http://{utils.state['REP_ADDRESS']}/file/list", headers=headers, params=params)
+    response = secure_requests.secure_get(f"http://{utils.state['REP_ADDRESS']}/file/list", headers=headers, params=params)
     response_data = response.json()
 
     if response.status_code != 200:

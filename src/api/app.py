@@ -1,10 +1,12 @@
 import base64
+from cryptography.hazmat.primitives import serialization, hashes
 from datetime import datetime
 from functools import wraps
 import os
 from flask import Flask, jsonify, request, send_file
 import json
 
+from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
 from database import initialize_db, close_db, get_db, REPO_PATH
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
@@ -23,21 +25,18 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            if request.method == 'GET':
-                data = request.args
-            elif request.content_type == 'application/json':
-                data = request.get_json() or {}
-            elif request.content_type.startswith('multipart/form-data'):
-                data = request.form
-            else:
-                return jsonify({"error": "Unsupported Media Type"}), 415
-            
+            try:
+                data = request.decrypted_params
+            except:
+                request.decrypted_params = get_right_body()
+                data = request.decrypted_params
+
             # Validate required fields
             needed_fields = []
             for field in required_fields:
                 if field not in data:
                     needed_fields.append(field)
-            
+
             if needed_fields:
                 return jsonify({"error": "Bad Request", "message": [f"{field} is required" for field in needed_fields]}), 400
             
@@ -52,7 +51,8 @@ def verify_session():
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get payload from request
-            data = request.headers
+            data = request.decrypted_headers
+            
             if not data:
                 return jsonify({"error": "No JSON payload found"}), 400
             
@@ -61,6 +61,7 @@ def verify_session():
             if not token:
                 return jsonify({"error": "Session token is missing"}), 401
             
+            print(token)
             # validate the token
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
@@ -72,8 +73,51 @@ def verify_session():
     return decorator
 
 
-# endpoints
+# secure comunication setup
+@app.route('/get-parameters', methods=['GET'])
+def get_parameters():
+    data = parameters.parameter_bytes(encoding=serialization.Encoding.PEM, format=serialization.ParameterFormat.PKCS3)
+    
+    return jsonify({"parameters": base64.b64encode(data).decode()}), 200
+
+@app.route('/dh-init', methods=['POST'])
+@verify_args(["client_id", "client_public_key"])
+def dh_init():
+
+    data = request.json
+    client_id = data["client_id"]
+    client_public_key_bytes = base64.b64decode(data["client_public_key"])
+
+    # deserialize client's public key
+    client_public_key = serialization.load_pem_public_key(client_public_key_bytes)
+
+    # gen server's private/public key pair
+    server_private_key = parameters.generate_private_key()
+    server_public_key = server_private_key.public_key()
+
+    # compute shared secret
+    shared_secret = server_private_key.exchange(client_public_key)
+    
+    # Serialize server's public key
+    server_public_key_bytes = server_public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(shared_secret)
+    valid_key = digest.finalize()  # 256-bit (32 bytes) key
+
+    client_shared_keys[client_id] = valid_key
+
+    return jsonify({
+        "server_public_key": base64.b64encode(server_public_key_bytes).decode()
+    }), 200
+
+
+# repo endpoints
 @app.route("/organization/list")
+@secure_endpoint()
 def org_list():
     db = get_db()
     cur = db.cursor()
@@ -97,7 +141,7 @@ def org_list():
             for org in organizations
         ]
 
-        return jsonify({"status": "success", "organizations": org_list})
+        return jsonify({"status": "success", "organizations": org_list}), 200
     
     except Exception as e:
         db.rollback()
@@ -108,13 +152,14 @@ def org_list():
 
 
 @app.route("/organization/create", methods=['POST'])
+@secure_endpoint()
 @verify_args(['organization', 'username', 'name', 'email', 'public_key'])
 def org_create():
     db = get_db()
     cur = db.cursor()
 
     # data parsing
-    data = request.get_json()
+    data = request.decrypted_params
     organization = data['organization']
     username = data['username']
     name = data['name']
@@ -148,7 +193,7 @@ def org_create():
         
         db.commit()
 
-        return jsonify({"id": cur.lastrowid, "organization": organization, "created_by": user_id}), 201
+        return jsonify({"id": cur.lastrowid, "organization": organization, "created_by": user_id}), 200
 
     except Exception as e:
         db.rollback()
@@ -159,22 +204,24 @@ def org_create():
 
 
 @app.route("/session/challenge")
+@secure_endpoint()
 @verify_args(['username'])
 def challenge():
 
-    data = request.args
+    data = request.decrypted_params
 
     # check if is already generated
     if data['username'] in challenges:
-        return json.dumps({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')})
+        return jsonify({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')}), 200
 
     # gen nonce
     nonce = data['username'].encode() + os.urandom(16)
     challenges[data['username']] = nonce
     
-    return json.dumps({"nounce": base64.b64encode(nonce).decode('utf-8')})
+    return jsonify({"nounce": base64.b64encode(nonce).decode('utf-8')}), 200
 
 @app.route("/session/create", methods=['POST'])
+@secure_endpoint()
 @verify_args(['organization', 'username', 'signature'])
 def authenticate():
     """
@@ -187,7 +234,7 @@ def authenticate():
         "encrypted_private_key": "base64_encoded_encrypted_private_key"
     }
     """
-    data = request.json
+    data = request.decrypted_params
     cur = get_db().cursor()
     
     # data parsing
@@ -232,6 +279,7 @@ def authenticate():
 
 
 @app.route("/file/upload", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
@@ -240,7 +288,7 @@ def upload_file():
     if 'document' not in request.files:
         return jsonify({"error": "No document file provided"}), 400
 
-    data = request.form
+    data = request.decrypted_params
 
     # parse JSON
     document_file = request.files['document']
@@ -253,7 +301,7 @@ def upload_file():
     nonce = data["nonce"]
     
     # Session data
-    ses_data = extrat_token_info(request.headers['session'])
+    ses_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = ses_data['org']
     usr_id = ses_data['usr']
 
@@ -298,15 +346,16 @@ def upload_file():
 
 
 @app.route("/file/list")
+@secure_endpoint()
 @verify_session()
 def list_docs():
     # parse args
-    username = request.args.get("username", "")
-    date = request.args.get("date", "")
-    date_filter_type = request.args.get("date_filter_type", "")  # nt | ot | et
+    username = request.decrypted_params.get("username", "")
+    date = request.decrypted_params.get("date", "")
+    date_filter_type = request.decrypted_params.get("date_filter_type", "")  # nt | ot | et
 
     # session data
-    tk_data = extrat_token_info(request.headers['session'])
+    tk_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = tk_data['org']
 
     # get data from db
@@ -369,7 +418,7 @@ def list_docs():
             for doc in docs
         ]
 
-        return jsonify({"status": "success", "documents": doc_list})
+        return jsonify({"status": "success", "documents": doc_list}), 200
     
     except Exception as e:
         con.rollback()
@@ -380,6 +429,7 @@ def list_docs():
 
 
 @app.route("/file/download/<file_handle>")
+@secure_endpoint()
 def get_file(file_handle: str):
 
     file_path = os.path.join(REPO_PATH, file_handle)
@@ -387,22 +437,26 @@ def get_file(file_handle: str):
     if not os.path.exists(file_path):
         return jsonify({"error": "File not found"}), 404
     
-    return send_file(file_path, as_attachment=True), 200
+    return send_file(file_path, as_attachment=True), 201
 
 
 @app.route("/ping")
+@secure_endpoint()
+@verify_session()
+@verify_args(["name"])
 def ping():
-    return json.dumps({"status": "up"})
+    return jsonify({"status": "up"}), 200
 
 
 @app.route("/file/metadata", methods=['GET'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
 def get_doc_metadata():
 
-    doc_name = request.args.get("document_name")
+    doc_name = request.decrypted_params.get("document_name")
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
     db = get_db()
@@ -454,13 +508,14 @@ def get_doc_metadata():
 
 #subject endpoints
 @app.route("/subject/add", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username", "name", "email", 'public_key'])
 def add_subject():
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data["username"]
     name = data["name"]
     email = data["email"]
@@ -486,16 +541,17 @@ def add_subject():
     finally:
         cur.close()
     
-    return jsonify({"status": "success", "client id": client_id})
+    return jsonify({"status": "success", "client id": client_id}), 200
 
 @app.route("/subject/add", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args([])
 def list_subjects():
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     
     org_id = session_data['org']
-    username = request.args.get("username", None)
+    username = request.decrypted_params.get("username", None)
 
     db = get_db()
     cur = db.cursor()
@@ -552,14 +608,15 @@ def list_subjects():
 
 
 @app.route("/subject/suspend", methods=["PUT"])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username"])
 def suspend_subject():
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data['username']
 
     db = get_db()
@@ -585,14 +642,15 @@ def suspend_subject():
 
 
 @app.route("/subject/activate", methods=["PUT"])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username"])
 def activate_subject():
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data['username']
 
     db = get_db()

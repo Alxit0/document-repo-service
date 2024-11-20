@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import requests
 import json
 
+import secure_requests
 import utils
 from utils import default_command, logger
 
 @default_command
 def rep_list_orgs():
 
-    res = requests.get(f"http://{utils.state['REP_ADDRESS']}/organization/list")
+    res = secure_requests.secure_get(f"http://{utils.state['REP_ADDRESS']}/organization/list")
 
     # check status of api call    
     logger.debug(res)

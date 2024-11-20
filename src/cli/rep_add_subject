@@ -2,7 +2,7 @@
 
 import json
 import click
-import requests
+import secure_requests
 
 import utils
 from utils import default_command, logger
@@ -33,10 +33,10 @@ def rep_add_subject(session_file:str, username:str, name:str, email:str, cred_fi
         "email": email,
         "public_key": public_key
     }
-    
-    res = requests.post(f"http://{utils.state['REP_ADDRESS']}/subject/add", headers=headers, json=body)
 
-    print(res.content)    
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/subject/add", headers=headers, json=body)
+
+    logger.info(json.loads(res.content))
 
 
 if __name__ == '__main__':

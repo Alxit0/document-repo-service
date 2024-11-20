@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-import requests
 import click
 import json
 import base64
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
+import secure_requests
 import utils
 from utils import default_command, logger
 
@@ -20,7 +20,7 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
     
     # get challenge
     params = {"username": username}
-    res = requests.get(f"http://{utils.state['REP_ADDRESS']}/session/challenge", params=params)
+    res = secure_requests.secure_get(f"http://{utils.state['REP_ADDRESS']}/session/challenge", params=params)
 
     logger.debug(res)
     if res.status_code != 200:
@@ -60,7 +60,7 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
         "signature": base64.b64encode(signature).decode()
     }
 
-    res = requests.post(f"http://{utils.state['REP_ADDRESS']}/session/create", json=payload)
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/session/create", json=payload)
     logger.debug(res)
     logger.info(res.content.decode())
     

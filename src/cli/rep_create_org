@@ -2,9 +2,8 @@
 
 import json
 import click
-import requests
 
-import json
+import secure_requests
 import utils
 from utils import default_command, logger
 
@@ -29,10 +28,11 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
         "public_key": public_key
     }
 
-    res = requests.post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/organization/create", json=body)
     logger.debug(res)
     logger.info(res.content.decode())
-    exit(0)
+    
+    return
 
 
 if __name__ == '__main__':

@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+import json
+import click
+import base64
+from file_encryption import decrypt_file
+
+from utils import default_command, logger
+
+@default_command
+@click.argument('encrypted_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('metadata', required=True, type=click.Path(exists=True, dir_okay=False))
+def rep_decrypt_file(encrypted_file: str, metadata: str):
+    
+    with open(metadata, "r") as file:
+        doc_meta = json.load(file)['metadata']
+    
+    key = base64.b64decode(doc_meta["encryption_key"])
+    iv = base64.b64decode(doc_meta["iv"])
+    nonce = base64.b64decode(doc_meta["nonce"])
+
+    algo, mode = doc_meta["algorithm"].split("-")
+    
+    file_path = encrypted_file
+
+    decrypt_file(key, iv, nonce, file_path, algo, mode)
+
+    logger.info("File decrypt sucesfully")
+
+
+if __name__ == '__main__':
+    rep_decrypt_file()
