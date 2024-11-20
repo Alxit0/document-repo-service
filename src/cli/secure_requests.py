@@ -1,3 +1,4 @@
+import copy
 import json as json_lib
 from typing import Literal
 import uuid
@@ -116,18 +117,18 @@ def prepare_data(headers, data, mode: Literal["params", "json", "data"]):
     hmac_value = create_hmac(encrypted_params, SHARED_SECRET_KEY)
 
     # add the IV and HMAC to headers
-    headers = headers or {}
-    headers.update({
+    new_headers = copy.deepcopy(headers) or {}
+    new_headers.update({
         "Client-Id": utils.state['client_id'],
         "X-Encrypted-IV": base64.b64encode(iv).decode(),
         "X-HMAC": base64.b64encode(hmac_value).decode()
     })
 
-    if "session" in headers:
+    if "session" in new_headers:
         encrypted_session_token = encrypt_message(headers["session"], SHARED_SECRET_KEY, iv)
-        headers["session"] = base64.b64encode(encrypted_session_token).decode()
+        new_headers["session"] = base64.b64encode(encrypted_session_token).decode()
 
-    return headers, {mode: {"payload": base64.b64encode(encrypted_params).decode()}}
+    return new_headers, {mode: {"payload": base64.b64encode(encrypted_params).decode()}}
 
 def prepare_response(response: requests.Response):
 
@@ -153,12 +154,12 @@ def secure_get(url, headers=None, params=None, *, _lvl=0):
     check_secure_key()
     
     # encrypt data
-    headers, body = prepare_data(headers, params, "params")
+    new_headers, body = prepare_data(headers, params, "params")
 
     # make request
     response = requests.get(
         url,
-        headers=headers,
+        headers=new_headers,
         **body
     )
 
@@ -175,16 +176,47 @@ def secure_post(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
 
     # encrypt data
     if data:
-        headers, body = prepare_data(headers, data, "data")
+        new_headers, body = prepare_data(headers, data, "data")
     elif json:
-        headers, body = prepare_data(headers, json, "json")
+        new_headers, body = prepare_data(headers, json, "json")
     else:
-        headers, body = prepare_data(headers, {}, "json")
+        new_headers, body = prepare_data(headers, {}, "json")
 
     # make request
     response = requests.post(
         url, 
-        headers=headers,
+        headers=new_headers,
+        **body,
+        files=files
+    )
+
+    # status_code 201 to skip decryption
+    if response.status_code == 201:
+        return response
+    
+    # regnociar keys
+    if response.status_code == 101 and _lvl < 2:
+        check_secure_key(force=True)
+        return secure_post(url, headers, data, json, files, _lvl=_lvl+1)
+
+    # decrypt response
+    return prepare_response(response)
+
+def secure_put(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
+    check_secure_key()
+
+    # encrypt data
+    if data:
+        new_headers, body = prepare_data(headers, data, "data")
+    elif json:
+        new_headers, body = prepare_data(headers, json, "json")
+    else:
+        new_headers, body = prepare_data(headers, {}, "json")
+
+    # make request
+    response = requests.put(
+        url, 
+        headers=new_headers,
         **body,
         files=files
     )

@@ -61,6 +61,7 @@ def verify_session():
             if not token:
                 return jsonify({"error": "Session token is missing"}), 401
             
+            print(token)
             # validate the token
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
@@ -507,13 +508,14 @@ def get_doc_metadata():
 
 #subject endpoints
 @app.route("/subject/add", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username", "name", "email", 'public_key'])
 def add_subject():
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data["username"]
     name = data["name"]
     email = data["email"]
@@ -539,16 +541,17 @@ def add_subject():
     finally:
         cur.close()
     
-    return jsonify({"status": "success", "client id": client_id})
+    return jsonify({"status": "success", "client id": client_id}), 200
 
 @app.route("/subject/add", methods=['POST'])
+@secure_endpoint()
 @verify_session()
 @verify_args([])
 def list_subjects():
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     
     org_id = session_data['org']
-    username = request.args.get("username", None)
+    username = request.decrypted_params.get("username", None)
 
     db = get_db()
     cur = db.cursor()
@@ -605,14 +608,15 @@ def list_subjects():
 
 
 @app.route("/subject/suspend", methods=["PUT"])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username"])
 def suspend_subject():
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data['username']
 
     db = get_db()
@@ -638,14 +642,15 @@ def suspend_subject():
 
 
 @app.route("/subject/activate", methods=["PUT"])
+@secure_endpoint()
 @verify_session()
 @verify_args(["username"])
 def activate_subject():
 
-    session_data = extrat_token_info(request.headers['session'])
+    session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
 
-    data = request.get_json()
+    data = request.decrypted_params
     username = data['username']
 
     db = get_db()

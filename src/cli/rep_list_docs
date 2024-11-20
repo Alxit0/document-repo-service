@@ -3,7 +3,6 @@
 from datetime import datetime
 from pprint import pprint
 import click
-import requests
 
 import secure_requests
 import utils

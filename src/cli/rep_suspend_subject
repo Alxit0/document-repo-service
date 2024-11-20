@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import click
-import requests
+import secure_requests
 
 import utils
 from utils import default_command, logger
@@ -20,7 +20,7 @@ def rep_suspend_subject(session_file: str, username: str):
         "username": username
     }
 
-    response = requests.put(
+    response = secure_requests.secure_put(
         f"http://{utils.state['REP_ADDRESS']}/subject/suspend",
         json=data,
         headers=headers

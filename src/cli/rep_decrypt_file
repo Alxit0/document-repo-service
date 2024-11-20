@@ -3,7 +3,7 @@
 import json
 import click
 import base64
-from file_encryption import decrypt_file, VALID_ALGOS_MODES_COMBOS
+from file_encryption import decrypt_file
 
 from utils import default_command, logger
 

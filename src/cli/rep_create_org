@@ -2,7 +2,6 @@
 
 import json
 import click
-import requests
 
 import secure_requests
 import utils
