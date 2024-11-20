@@ -29,11 +29,15 @@ DOCUMENT_PATH1="$HOME/Documents/LOL_2.txt"
 DOCUMENT_NAME1="LOL_2"
 FILE_HANDLE1="35e34d121176ffa0793c26966528f0037e54efd9e617598513a7f425b1abae90"
 DOWNLOAD_PATH1="$HOME/Downloads/LOL_2_copy.txt"
+DOWNLOAD_PATH_1="$HOME/Downloads/LOL_2_copy_.txt"
 
 DOCUMENT_PATH2="$HOME/Documents/WOW_1.txt"
 DOCUMENT_NAME2="WOW_1"
 FILE_HANDLE2="6d83b23024c75911246bc1756f0cab3d5a6234017129a0f7b4f8de2e4be1baee"
 DOWNLOAD_PATH2="$HOME/Downloads/WOW_1_copy.txt"
+DOWNLOAD_PATH_2="$HOME/Downloads/WOW_1_copy_.txt"
+
+DOCUMENT_PATH_3="$HOME/Documents/WOW_1_Metadata.json"
 
 # Change to the 'cli' directory
 cd .. && cd cli
@@ -112,7 +116,6 @@ if [ ! -f "$DOCUMENT_PATH2" ]; then
     echo "Creating a new sample document at $DOCUMENT_PATH2."
     echo "This is a sample document 3 for testing purposes of Org. WOW." > "$DOCUMENT_PATH2"
 fi
-
 
 echo " "
 echo "======================================================"
@@ -257,6 +260,126 @@ echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
 if [ $? -ne 0 ]
 then
     echo "Error: Failed to get file !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Delete Doc                         |"
+echo "======================================================"
+
+# get file and Download it
+./rep_delete_doc "$SESSION_FILE_LOL" "$DOCUMENT_NAME1"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Get Doc file                       |"
+echo "======================================================"
+
+# get file and print in terminal
+./rep_get_doc_file "$SESSION_FILE_LOL" "$DOCUMENT_NAME0"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
+    exit 1
+fi
+
+echo " "
+echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
+# get file and print in terminal
+./rep_get_doc_file "$SESSION_FILE_LOL" "$DOCUMENT_NAME1"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
+    exit 1
+fi
+
+echo " "
+echo "- - - - - - - - - - - - - - - - - - - - - - - - - - "
+echo " try to get deleted file "
+# get file and Download it
+./rep_get_doc_file "$SESSION_FILE_WOW" "$DOCUMENT_NAME1" "$DOWNLOAD_PATH_2"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Decrypt file                       |-----------------------------------------------"
+echo "======================================================"
+
+# get file and print in terminal
+#./rep_decrypt_file "$SESSION_FILE_WOW" "metadatas/WOW_1_meta.json"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get file"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Create Subjects                    |"
+echo "======================================================"
+
+# get file and Download it
+./rep_add_subject "$SESSION_FILE_LOL" "lol9000" "Henry" "henry@sample.com" "$CREDENTIALS_FILE_LOL"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to create Subjects !!!"
+    exit 1
+fi
+
+# get file and Download it
+./rep_add_subject "$SESSION_FILE_LOL" "lol9001" "Hellen" "hellen@sample.com" "$CREDENTIALS_FILE_LOL"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to create Subjects !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 List Subjects                      |-----------------------------------------------"
+echo "======================================================"
+
+# get file and Download it
+#./rep_list_subjects "$SESSION_FILE_LOL"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get Subjects list !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                Suspend subject                     |"
+echo "======================================================"
+
+# get file and Download it
+./rep_suspend_subject "$SESSION_FILE_LOL" "lol9000"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get Subjects list !!!"
+    exit 1
+fi
+
+echo " "
+echo "======================================================"
+echo "|                 Activate subjects                  |"
+echo "======================================================"
+
+# get file and Download it
+./rep_suspend_subject "$SESSION_FILE_LOL" "lol9000"
+if [ $? -ne 0 ]
+then
+    echo "Error: Failed to get Subjects list !!!"
     exit 1
 fi
 
