@@ -181,3 +181,152 @@ This command reads the session token from `session_file` and fetches metadata fo
 - If metadata retrieval fails, an error message with the server’s response is displayed.
 - The server endpoint for retrieving metadata is `http://{utils.state['REP_ADDRESS']}/file/metadata`.
 - Ensure `utils.state['REP_ADDRESS']` contains the correct server address for the metadata request to succeed.
+
+## Command: `rep_list_subjects`
+The `rep_list_subjects` command lists subjects associated with the organization. Optionally, the results can be filtered by a specific username.
+
+### Usage
+```bash
+rep_list_subjects [OPTIONS] <session_file> [username]
+```
+
+This command uses the session token from `session_file` to authenticate the request. If `username` is provided, only the details for that user will be returned. Otherwise, the command lists all subjects for the organization.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and contain a valid session token.
+- `username` (optional): The username to filter the list of subjects. If not provided, all subjects are listed.
+
+### Notes
+- The server endpoint for listing subjects is `http://{utils.state['REP_ADDRESS']}/subject/list`.
+- Each subject is displayed with their username, name, and status (Active or Suspended).
+- If no subjects match the criteria, a message indicating this is displayed.
+- Ensure `utils.state['REP_ADDRESS']` is set to the correct server address.
+
+## Command: `rep_add_subject`
+The `rep_add_subject` command adds a new subject to the system, providing their username, name, email, and public key. This is done using the session token for authentication.
+
+### Usage
+```bash
+rep_add_subject [OPTIONS] <session_file> <username> <name> <email> <cred_file>
+```
+
+This command uses the session token from `session_file` and the public key from the provided `cred_file` to add a new subject to the system with the given `username`, `name`, and `email`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and contain a valid session token.
+- `username` (required): The username of the subject being added.
+- `name` (required): The full name of the subject.
+- `email` (required): The email address of the subject.
+- `cred_file` (required): Path to the file containing the subject’s public key. This file must exist and contain a valid public key under the key `REP_PUB_KEY`.
+
+### Notes
+- The command loads and decrypts the public key from `cred_file`.
+- The server endpoint for adding a subject is `http://{utils.state['REP_ADDRESS']}/subject/add`.
+- The command sends a POST request with the subject details (username, name, email, and public key) in the request body.
+- Ensure that `utils.state['REP_ADDRESS']` is correctly set to the appropriate server address for communication.
+
+## Command: `rep_suspend_subject`
+The `rep_suspend_subject` command suspends a specified subject in the system. It requires a valid session token and the username of the subject to be suspended.
+
+### Usage
+```bash
+rep_suspend_subject [OPTIONS] <session_file> <username>
+```
+
+This command uses the session token from `session_file` to authenticate the request and suspends the subject identified by `username`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `username` (required): The username of the subject to suspend.
+
+### Notes
+- The server endpoint for suspending a subject is `http://{utils.state['REP_ADDRESS']}/subject/suspend`.
+- Upon successful suspension, a message indicating the success is displayed.
+- If the suspension fails, an error message is shown along with the response text from the server.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_activate_subject`
+The `rep_activate_subject` command reactivates a suspended subject in the system. It requires a valid session token and the username of the subject to be reactivated.
+
+### Usage
+```bash
+rep_activate_subject [OPTIONS] <session_file> <username>
+```
+
+This command uses the session token from `session_file` to authenticate the request and reactivates the subject identified by `username`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `username` (required): The username of the subject to reactivate.
+
+### Notes
+- The server endpoint for reactivating a subject is `http://{utils.state['REP_ADDRESS']}/subject/activate`.
+- Upon successful reactivation, a message indicating success is displayed.
+- If the reactivation fails, an error message is shown along with the response text from the server.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_get_doc_file`
+The `rep_get_doc_file` command retrieves a document from the server, downloads its metadata and file content, and decrypts the file based on the metadata. The decrypted content is either printed to the console or saved to a specified file.
+
+### Usage
+```bash
+rep_get_doc_file [OPTIONS] <session_file> <document_name> [file]
+```
+
+This command uses the session token from `session_file` to authenticate the request. It first retrieves the document metadata, then fetches and decrypts the document file. The decrypted file can be output to the console or saved to the specified file.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `document_name` (required): The name of the document to retrieve.
+- `file` (optional): The local path where the decrypted file will be saved. If omitted, the file content is printed to the console.
+
+### Notes
+- The command first fetches metadata for the document, including its encryption details and file handle.
+- The file is then downloaded and decrypted using the encryption key, IV, and nonce from the metadata.
+- If `file` is not provided, the decrypted file is printed as plain text. If a `file` path is given, the decrypted content is saved to that file.
+- The server endpoint for retrieving metadata is `http://{utils.state['REP_ADDRESS']}/file/metadata` and for downloading the file is `http://{utils.state['REP_ADDRESS']}/file/download/{file_handle}`.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_decrypt_file`
+The `rep_decrypt_file` command decrypts an encrypted file using the provided metadata. It reads the decryption parameters from the metadata file, decrypts the encrypted file, and logs the success of the operation.
+
+### Usage
+```bash
+rep_decrypt_file [OPTIONS] <encrypted_file> <metadata>
+```
+
+This command decrypts the file specified by `encrypted_file` using the decryption parameters found in the `metadata` file.
+
+### Parameters
+- `encrypted_file` (required): Path to the encrypted file that needs to be decrypted. This file must exist.
+- `metadata` (required): Path to the file containing the metadata for decryption, including the encryption key, IV, nonce, and algorithm details. This file must exist.
+
+### Notes
+- The `metadata` file must contain a JSON object with a `metadata` field that includes:
+  - `encryption_key`: The encryption key (base64 encoded).
+  - `iv`: The initialization vector (base64 encoded).
+  - `nonce`: The nonce used in encryption (base64 encoded).
+  - `algorithm`: The encryption algorithm and mode (e.g., `AES-GCM`).
+- The decryption process is done using the `decrypt_file` function, which takes the decryption parameters (key, iv, nonce, algorithm, and mode) to decrypt the file.
+- After the file is decrypted, a success message is logged.
+- Ensure that the paths to both the encrypted file and metadata file are correct.
+
+## Command: `rep_delete_doc`
+The `rep_delete_doc` command deletes a specified document from the system. It requires a valid session token and the document's name to be deleted.
+
+### Usage
+```bash
+rep_delete_doc [OPTIONS] <session_file> <document_name>
+```
+
+This command uses the session token from `session_file` to authenticate the request and delete the document identified by `document_name`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `document_name` (required): The name of the document to delete.
+
+### Notes
+- The server endpoint for deleting the document is `http://{utils.state['REP_ADDRESS']}/file/delete`.
+- The command sends a PUT request with the document name in the request body for deletion.
+- After the request is made, the response from the server is logged.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.

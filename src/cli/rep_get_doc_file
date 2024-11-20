@@ -14,7 +14,7 @@ from utils import default_command, logger
 @click.argument('session_file', required=True, type=click.Path(exists=False, dir_okay=False))
 @click.argument('document_name', required=True, type=str)
 @click.argument('file', required=False, type=click.Path(exists=False))
-def rep_get_file(session_file: str, document_name: str, file: str):
+def rep_get_doc_file(session_file: str, document_name: str, file: str):
 
     with open(session_file, 'r') as f:
         session_token = f.read()
@@ -69,4 +69,4 @@ def rep_get_file(session_file: str, document_name: str, file: str):
     
 
 if __name__ == '__main__':
-    rep_get_file()
+    rep_get_doc_file()
