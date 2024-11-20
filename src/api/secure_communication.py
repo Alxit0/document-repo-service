@@ -9,8 +9,24 @@ import os
 # Shared secret key for encryption and HMAC
 SHARED_SECRET_KEY = b'\xe4\xe1\x9d\xef\xcc\xc8\xf7\x1f5p\xda\x83\xe4\xc1W\x06\xbdQgH\xe7\xda\xd0\xd5c\x13D\x0f\xee$fG'
 
+
+def get_right_body():
+    body: dict = None
+
+    if request.method == 'GET':
+        body = request.args
+    elif request.content_type == 'application/json':
+        body = request.get_json()
+    elif request.content_type.startswith('multipart/form-data'):
+        body = request.form
+
+    return body
+
 # Helper functions for encryption, decryption, HMAC, etc.
 def decrypt_message(ciphertext, key, iv):
+    if not ciphertext:
+        return b"{}"
+    
     cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext) + decryptor.finalize()
@@ -19,6 +35,7 @@ def encrypt_message(message, key, iv):
     cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
     encryptor = cipher.encryptor()
     return encryptor.update(message.encode()) + encryptor.finalize()
+
 
 def create_hmac(data, key):
     h = hmac.HMAC(key, hashes.SHA256())
@@ -36,48 +53,32 @@ def secure_endpoint():
         @wraps(func)
         def wrapper(*args, **kwargs):
             try:
-                # Step 1: Extract encrypted payload and headers
-                if request.method == 'GET':
-                    payload = base64.b64decode(request.args.get("payload", ""))
-                elif request.content_type == 'application/json':
-                    payload = base64.b64decode(request.get_json().get("payload", ""))
-                elif request.content_type.startswith('multipart/form-data'):
-                    payload = base64.b64decode(request.form.get("payload", ""))
-                else:
-                    return jsonify({"error": "Unsupported Media Type"}), 415
+                body = get_right_body()
 
+                # extract encrypted payload and headers
+                payload = base64.b64decode(body.get("payload", ""))
                 iv = base64.b64decode(request.headers.get("X-Encrypted-IV", ""))
                 received_hmac = base64.b64decode(request.headers.get("X-HMAC", ""))
                 encrypted_session_token = request.headers.get("Session", "")
 
-                # Step 2: Verify the HMAC
+                # verify the HMAC
                 verify_hmac(payload, SHARED_SECRET_KEY, received_hmac)
 
-                # Step 3: Decrypt the payload
+                # decrypt the payload and nessessary headers
                 decrypted_params = decrypt_message(payload, SHARED_SECRET_KEY, iv).decode()
+                request.decrypted_params = json.loads(decrypted_params)
 
-                if encrypted_session_token:
-                    encrypted_session_bytes = base64.b64decode(encrypted_session_token)
-                    decrypted_session_token = decrypt_message(encrypted_session_bytes, SHARED_SECRET_KEY, iv).decode()
+                encrypted_session_bytes = base64.b64decode(encrypted_session_token)
+                decrypted_session_token = decrypt_message(encrypted_session_bytes, SHARED_SECRET_KEY, iv).decode()
+                request.decrypted_headers = {**request.headers, "session": decrypted_session_token}
+
                 
-                # Parse parameters into the request context
-                if not decrypted_params:
-                    pass
-                elif request.method == 'GET':
-                    request.decrypted_params = dict(
-                        param.split("=") for param in decrypted_params.split("&")
-                    )
-                else:
-                    request.decrypted_params = json.loads(decrypted_params)
-
-                if encrypted_session_token:
-                    request.decrypted_headers = {**request.headers, "session": decrypted_session_token}
-
-                # Step 4: Execute the original function
+                # execute the original function
                 response_message, code = func(*args, **kwargs)
                 response_message: Response
 
-                # Step 5: Encrypt the response
+                
+                # encrypt the response
                 if response_message.direct_passthrough:
                     return response_message, code
 
@@ -92,7 +93,7 @@ def secure_endpoint():
                 }), code
 
             except Exception as e:
-                print(e.with_traceback())
+                e.with_traceback()
                 return jsonify({"error": "Invalid request", "message": str(e)}), 400
 
         return wrapper

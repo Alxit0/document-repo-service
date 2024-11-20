@@ -1,4 +1,5 @@
 import json as json_lib
+from typing import Literal
 import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, hmac
@@ -31,17 +32,21 @@ def verify_hmac(data, key, hmac_to_verify):
     h.verify(hmac_to_verify)
 
 
-def secure_get(url, headers=None, params=None):
-    
-    # Step 1: Encrypt the parameters
+def prepare_data(headers, data, mode: Literal["params", "json", "data"]):
+
+    if data is None:
+        data = {}
+
+    # encrypt the parameters
     iv = os.urandom(16)
-    query_string = "&".join([f"{key}={value}" for key, value in (params or {}).items()])
+
+    query_string = json_lib.dumps(data)
     encrypted_params = encrypt_message(query_string, SHARED_SECRET_KEY, iv)
 
-    # Step 2: Generate HMAC for the encrypted parameters
+    # generate HMAC for the encrypted parameters
     hmac_value = create_hmac(encrypted_params, SHARED_SECRET_KEY)
 
-    # Step 3: Add the IV and HMAC to headers
+    # add the IV and HMAC to headers
     headers = headers or {}
     headers.update({
         "X-Encrypted-IV": base64.b64encode(iv).decode(),
@@ -52,11 +57,11 @@ def secure_get(url, headers=None, params=None):
         encrypted_session_token = encrypt_message(headers["session"], SHARED_SECRET_KEY, iv)
         headers["session"] = base64.b64encode(encrypted_session_token).decode()
 
-    # Step 4: Make the request with the encrypted payload
-    response = requests.get(url, headers=headers, params={"payload": base64.b64encode(encrypted_params).decode()})
+    return headers, {mode: {"payload": base64.b64encode(encrypted_params).decode()}}
 
-    # Step 5: Process the response
+def prepare_response(response: requests.Response):
 
+    # status_code 201 to skip decryption
     if response.status_code == 201:
         return response
 
@@ -73,56 +78,42 @@ def secure_get(url, headers=None, params=None):
     response._content = decrypted_response
     return response
 
+
+def secure_get(url, headers=None, params=None):
+    
+    # encrypt data
+    headers, body = prepare_data(headers, params, "params")
+
+    # make request
+    response = requests.get(
+        url,
+        headers=headers,
+        **body
+    )
+    
+    # decrypt response
+    return prepare_response(response)
+
 def secure_post(url, headers=None, data=None, json=None, files=None):
-    if json and not data:
-        data = json
-        
-    # Step 1: Encrypt the parameters
-    iv = os.urandom(16)
-    query_string = json_lib.dumps(data)
-    encrypted_params = encrypt_message(query_string, SHARED_SECRET_KEY, iv)
 
-    # Step 2: Generate HMAC for the encrypted parameters
-    hmac_value = create_hmac(encrypted_params, SHARED_SECRET_KEY)
-
-    # Step 3: Add the IV and HMAC to headers
-    headers = headers or {}
-    headers.update({
-        "X-Encrypted-IV": base64.b64encode(iv).decode(),
-        "X-HMAC": base64.b64encode(hmac_value).decode()
-    })
-
-    if "session" in headers:
-        encrypted_session_token = encrypt_message(headers["session"], SHARED_SECRET_KEY, iv)
-        headers["session"] = base64.b64encode(encrypted_session_token).decode()
-
-    # Step 4: Make the request with the encrypted payload
-    if json:
-        payload_conf = {"json": {"payload": base64.b64encode(encrypted_params).decode()}}
+    # encrypt data
+    if data:
+        headers, body = prepare_data(headers, data, "data")
+    elif json:
+        headers, body = prepare_data(headers, json, "json")
     else:
-        payload_conf = {"data": {"payload": base64.b64encode(encrypted_params).decode()}}
+        headers, body = prepare_data(headers, {}, "json")
 
+    # make request
     response = requests.post(
         url, 
         headers=headers,
-        **payload_conf,
+        **body,
         files=files
     )
 
-    # Step 5: Process the response
-    
-    # Extract encrypted response
-    encrypted_response = base64.b64decode(response.json()["ciphertext"])
-    response_iv = base64.b64decode(response.json()["iv"])
-    response_hmac = base64.b64decode(response.json()["hmac"])
-
-    # Verify the HMAC
-    verify_hmac(encrypted_response, SHARED_SECRET_KEY, response_hmac)
-
-    # Decrypt the response
-    decrypted_response = decrypt_message(encrypted_response, SHARED_SECRET_KEY, response_iv)
-    response._content = decrypted_response
-    return response
+    # decrypt response
+    return prepare_response(response)
 
 
 def _example():

@@ -24,23 +24,7 @@ def verify_args(required_fields):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get data
-            if request.method == 'GET':
-                try:
-                    data = request.decrypted_params
-                except:
-                    data = request.args
-            elif request.content_type == 'application/json':
-                try:
-                    data = request.decrypted_params
-                except:
-                    data = request.get_json() or {}
-            elif request.content_type.startswith('multipart/form-data'):
-                try:
-                    data = request.decrypted_params
-                except:
-                    data = request.form
-            else:
-                return jsonify({"error": "Unsupported Media Type"}), 415
+            data = request.decrypted_params
             
             # Validate required fields
             needed_fields = []
@@ -62,11 +46,7 @@ def verify_session():
         @wraps(func)
         def wrapper(*args, **kwargs):
             # get payload from request
-            try:
-                data = request.decrypted_headers
-            except:
-                data = request.headers
-
+            data = request.decrypted_headers
             
             if not data:
                 return jsonify({"error": "No JSON payload found"}), 400
@@ -465,8 +445,6 @@ def get_doc_metadata():
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
     finally:
         cur.close()
-
-
 
 
 if __name__ == '__main__':
