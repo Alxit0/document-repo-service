@@ -2,10 +2,23 @@
 
 import json
 import click
+from requests import Response
 
 import secure_requests
 import utils
 from utils import default_command, logger
+
+def calc_exit_code(res: Response):
+    if res.status_code == 200:
+        return 0
+    
+    content = json.loads(res.content)
+    message = content['message']
+
+    if 'organizations.name' in message:
+        return -1
+
+    return 0
 
 @default_command
 @click.argument('organization', required=True, type=str)
@@ -32,7 +45,7 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     logger.debug(res)
     logger.info(res.content.decode())
     
-    return
+    return calc_exit_code(res)
 
 
 if __name__ == '__main__':

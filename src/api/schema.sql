@@ -8,8 +8,8 @@ CREATE TABLE organizations (
 CREATE TABLE subjects ( 
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     
-    username TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL,
 
     full_name TEXT,
     public_key TEXT,
