@@ -99,7 +99,6 @@ def verify_token(token: str, *, verify_exp=True) -> bool:
     except exceptions.DecodeError:
         # in case we cannot decode
 
-        # print(token)
         return False
     except exceptions.ExpiredSignatureError:
         # in case the token validation as expired

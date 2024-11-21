@@ -3,11 +3,11 @@ from cryptography.hazmat.primitives import serialization, hashes
 from datetime import datetime
 from functools import wraps
 import os
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, g
 import json
 
 from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
-from database import initialize_db, close_db, get_db, REPO_PATH
+from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
@@ -61,7 +61,6 @@ def verify_session():
             if not token:
                 return jsonify({"error": "Session token is missing"}), 401
             
-            print(token)
             # validate the token
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
@@ -113,6 +112,20 @@ def dh_init():
     return jsonify({
         "server_public_key": base64.b64encode(server_public_key_bytes).decode()
     }), 200
+
+@app.route('/jail-house-lock', methods=['GET'])
+def clean_database():
+    
+    db = get_db()
+    db.close()
+
+    os.remove(DATABASE)
+    g.pop('db')
+
+    with app.app_context():
+        initialize_db()
+
+    return jsonify({"status": "success"}), 200
 
 
 # repo endpoints
