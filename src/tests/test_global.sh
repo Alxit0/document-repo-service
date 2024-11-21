@@ -8,4 +8,4 @@ source functions.sh
 
 ./test_rep_subject_credentials.sh
 ./test_rep_create_org.sh
-    
+./test_rep_create_session.sh

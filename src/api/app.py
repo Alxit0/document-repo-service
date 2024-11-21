@@ -259,7 +259,7 @@ def authenticate():
     cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
     org_id = cur.fetchone()
     if not org_id:
-        return jsonify({"error": "Organization not found"}), 404
+        return jsonify({"error": "Internal Server Error", "message": "Organization not found"}), 404
     org_id = org_id[0]
 
     # Retrieve the stored public key for the username
@@ -267,7 +267,7 @@ def authenticate():
     res:str = cur.fetchone()
     
     if res is None:
-        return jsonify({"error": "User not found within organization"}), 404
+        return jsonify({"error": "Internal Server Error", "message": "User not found within organization"}), 404
 
     stored_public_key_bytes = res[0]
     user_id = res[1]
