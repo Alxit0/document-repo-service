@@ -15,15 +15,14 @@ curl "http://127.0.0.1:5000/jail-house-lock" > /dev/null 2>&1
 run_test "./rep_create_session sal-aveiro Alxito ola1231 user1.creds user1.ses" 0
 run_test "./rep_create_session cruzaders Benny ola1232 user2.creds user2.ses" 0
 
-# wrong password
+# wrong password / creds
 run_test "./rep_create_session sal-aveiro Alxito ola1232 user1.creds user1.ses" 255
-
-# wrong creds
 run_test "./rep_create_session sal-aveiro Alxito1 ola1231 user2.creds user1.ses" 255
 
 
 # user not found
 run_test "./rep_create_session sal-aveiro Alxito1 ola1231 user1.creds user1.ses" 254
+run_test "./rep_create_session sal-aveiro Benny ola1232 user2.creds user2.ses" 254
 
 # org not found
 run_test "./rep_create_session sal-aveiro1 Alxito ola1231 user1.creds user1.ses" 253
