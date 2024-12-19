@@ -90,7 +90,6 @@ def secure_endpoint():
 
                 shared_secret_key = client_shared_keys[client_id]
 
-                print(shared_secret_key.hex())
                 # verify the HMAC
                 verify_hmac(payload, shared_secret_key, received_hmac)
 

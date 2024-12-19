@@ -4,7 +4,6 @@ from datetime import datetime
 from functools import wraps
 import os
 from flask import Flask, jsonify, request, send_file
-import json
 
 from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
 from database import initialize_db, close_db, get_db, REPO_PATH
@@ -61,10 +60,20 @@ def verify_session():
             if not token:
                 return jsonify({"error": "Session token is missing"}), 401
             
-            print(token)
             # validate the token
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
+            
+            return func(*args, **kwargs)
+        
+        return wrapper
+    
+    return decorator
+
+def verify_permission(required_permission):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             
             return func(*args, **kwargs)
         
@@ -115,7 +124,7 @@ def dh_init():
     }), 200
 
 
-# repo endpoints
+# organization endpoints
 @app.route("/organization/list")
 @secure_endpoint()
 def org_list():
@@ -149,7 +158,6 @@ def org_list():
     
     finally:
         cur.close()
-
 
 @app.route("/organization/create", methods=['POST'])
 @secure_endpoint()
@@ -203,6 +211,7 @@ def org_create():
         cur.close()
 
 
+# session endpoints
 @app.route("/session/challenge")
 @secure_endpoint()
 @verify_args(['username'])
@@ -278,9 +287,11 @@ def authenticate():
     return jsonify({"message": "Authentication successful", "session_token": write_token(token_info)}), 200
 
 
+# file endpoints
 @app.route("/file/upload", methods=['POST'])
 @secure_endpoint()
 @verify_session()
+@verify_permission("DOC_NEW")
 @verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
 def upload_file():
 
@@ -343,7 +354,6 @@ def upload_file():
         "document_id": doc_id,
         "file_handle": file_handle
     }), 200
-
 
 @app.route("/file/list")
 @secure_endpoint()
@@ -425,7 +435,6 @@ def list_docs():
     finally:
         cur.close()
 
-
 @app.route("/file/download/<file_handle>")
 @secure_endpoint()
 def get_file(file_handle: str):
@@ -436,15 +445,6 @@ def get_file(file_handle: str):
         return jsonify({"error": "File not found"}), 404
     
     return send_file(file_path, as_attachment=True), 201
-
-
-@app.route("/ping")
-@secure_endpoint()
-@verify_session()
-@verify_args(["name"])
-def ping():
-    return jsonify({"status": "up"}), 200
-
 
 @app.route("/file/metadata", methods=['GET'])
 @secure_endpoint()
@@ -651,7 +651,6 @@ def list_subjects():
     finally:
         cur.close()
 
-
 @app.route("/subject/suspend", methods=["PUT"])
 @secure_endpoint()
 @verify_session()
@@ -685,7 +684,6 @@ def suspend_subject():
     finally:
         cur.close()
 
-
 @app.route("/subject/activate", methods=["PUT"])
 @secure_endpoint()
 @verify_session()
@@ -718,6 +716,14 @@ def activate_subject():
     finally:
         cur.close()
 
+
+
+@app.route("/ping")
+@secure_endpoint()
+@verify_session()
+@verify_args(["name"])
+def ping():
+    return jsonify({"status": "up"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)

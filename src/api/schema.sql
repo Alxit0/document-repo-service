@@ -48,3 +48,87 @@ CREATE TABLE document_metadata (
 
     FOREIGN KEY (document_id) REFERENCES documents(id)
 );
+
+-- TABLE: Permissions
+CREATE TABLE permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE -- E.g., DOC_ACL, DOC_READ, DOC_DELETE, etc.
+);
+
+-- TABLE: Roles
+CREATE TABLE roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    name TEXT NOT NULL,               -- E.g., "Managers", "Editors"
+    organization_id INTEGER NOT NULL, -- Organization to which the role belongs
+    status BOOLEAN DEFAULT TRUE,      -- TRUE = Active, FALSE = Suspended
+    
+    FOREIGN KEY (organization_id) REFERENCES organizations(id),
+    UNIQUE (organization_id, name)    -- Unique role name within an organization
+);
+
+-- para cada subject que roles ele pode pedir
+-- TABLE: Subject Roles (Mapping Subjects to Roles)
+CREATE TABLE subject_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    subject_id INTEGER NOT NULL, -- Subject assuming the role
+    role_id INTEGER NOT NULL,    -- Role being assigned to the subject
+    
+    status BOOLEAN DEFAULT TRUE, -- TRUE = Active, FALSE = Suspended
+    
+    FOREIGN KEY (subject_id) REFERENCES subjects(id),
+    FOREIGN KEY (role_id) REFERENCES roles(id),
+    UNIQUE (subject_id, role_id) -- Prevent duplicate role assignments
+);
+
+-- que permissoes cada role tem para tal doc
+-- TABLE: Document ACLs (Permissions for Documents)
+CREATE TABLE document_acls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    document_id INTEGER NOT NULL,
+    role_id INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+
+    FOREIGN KEY (document_id) REFERENCES documents(id),
+    FOREIGN KEY (role_id) REFERENCES roles(id),
+    FOREIGN KEY (permission_id) REFERENCES permissions(id),
+    UNIQUE (document_id, role_id, permission_id) -- Ensure unique permission per document and role
+);
+
+-- que permissoes cada role tem para tal org
+-- TABLE: Organization ACLs (Permissions for Organization Management)
+CREATE TABLE organization_acls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    organization_id INTEGER NOT NULL,
+    role_id INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+    
+    FOREIGN KEY (organization_id) REFERENCES organizations(id),
+    FOREIGN KEY (role_id) REFERENCES roles(id),
+    FOREIGN KEY (permission_id) REFERENCES permissions(id),
+    UNIQUE (organization_id, role_id, permission_id) -- Ensure unique permission per organization and role
+);
+
+-- Insert permissions related to document management
+INSERT INTO permissions (name) VALUES 
+    ('DOC_ACL'),
+    ('DOC_READ'),
+    ('DOC_DELETE');
+
+-- Insert permissions related to organization management
+INSERT INTO permissions (name) VALUES 
+    ('ROLE_ACL'),
+    ('SUBJECT_NEW'),
+    ('SUBJECT_DOWN'),
+    ('SUBJECT_UP'),
+    ('DOC_NEW');
+
+-- Insert permissions related to role management
+INSERT INTO permissions (name) VALUES 
+    ('ROLE_NEW'),
+    ('ROLE_DOWN'),
+    ('ROLE_UP'),
+    ('ROLE_MOD');
