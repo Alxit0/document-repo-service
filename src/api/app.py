@@ -551,7 +551,7 @@ def delete_file():
         cur.close()
 
 
-#subject endpoints
+# subject endpoints
 @app.route("/subject/add", methods=['POST'])
 @secure_endpoint()
 @verify_session()
@@ -716,6 +716,22 @@ def activate_subject():
     finally:
         cur.close()
 
+
+# role / permission enpoints
+@app.route("/role/assume", methods=["POST"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role'])
+def assume_role():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    usr = session_data['usr']
+
+    data = request.decrypted_params
+    role = data['role']
+
+    print(f"User {usr} Asked for {role} role")
+
+    return jsonify({"status": "success", "message": f"User {usr} Asked for {role} role"}), 200
 
 
 @app.route("/ping")
