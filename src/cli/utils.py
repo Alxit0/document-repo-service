@@ -101,6 +101,8 @@ def default_command(func):
         resp = func(*args, **kwargs)
 
         save(state)
+        
+        sys.exit(resp if resp is not None else -1)
         return resp
             
     return wrapper

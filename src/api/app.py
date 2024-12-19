@@ -3,10 +3,11 @@ from cryptography.hazmat.primitives import serialization, hashes
 from datetime import datetime
 from functools import wraps
 import os
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, g
+import json
 
 from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
-from database import initialize_db, close_db, get_db, REPO_PATH
+from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
 app = Flask(__name__)
@@ -122,6 +123,20 @@ def dh_init():
     return jsonify({
         "server_public_key": base64.b64encode(server_public_key_bytes).decode()
     }), 200
+
+@app.route('/jail-house-lock', methods=['GET'])
+def clean_database():
+    
+    db = get_db()
+    db.close()
+
+    os.remove(DATABASE)
+    g.pop('db')
+
+    with app.app_context():
+        initialize_db()
+
+    return jsonify({"status": "success"}), 200
 
 
 # organization endpoints
@@ -255,7 +270,7 @@ def authenticate():
     cur.execute("SELECT id FROM organizations WHERE name == ?", (organization_name,))
     org_id = cur.fetchone()
     if not org_id:
-        return jsonify({"error": "Organization not found"}), 404
+        return jsonify({"error": "Internal Server Error", "message": "Organization not found"}), 404
     org_id = org_id[0]
 
     # Retrieve the stored public key for the username
@@ -263,7 +278,7 @@ def authenticate():
     res:str = cur.fetchone()
     
     if res is None:
-        return jsonify({"error": "User not found within organization"}), 404
+        return jsonify({"error": "Internal Server Error", "message": "User not found within organization"}), 404
 
     stored_public_key_bytes = res[0]
     user_id = res[1]
