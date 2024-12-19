@@ -773,11 +773,35 @@ def assume_role():
     usr = session_data['usr']
 
     data = request.decrypted_params
-    role = data['role']
+    role: str = data['role']
 
-    print(f"User {usr} Asked for {role} role")
+    db = get_db()
+    cur = db.cursor()
 
-    return jsonify({"status": "success", "message": f"User {usr} Asked for {role} role"}), 200
+    try:
+        cur.execute("""
+            SELECT r.name AS role_name
+            FROM subject_roles sr
+            JOIN roles r ON sr.role_id = r.id
+            WHERE sr.subject_id = ? AND sr.status = TRUE;
+        """, (usr,))
+        subject_allowed_roles = cur.fetchall()
+
+        if role.lower() not in map(str.lower, subject_allowed_roles):
+            return jsonify({"error": "Subject does not have permission for this role."}), 202
+
+        if 'role' not in session_data:
+            session_data['role'] = []
+        session_data['role'].append(role)
+                
+        db.commit()
+        return jsonify({"status": "success", "session_token": write_token(session_data)}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
 
 
 @app.route("/ping")
