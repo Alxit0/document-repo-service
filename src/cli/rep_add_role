@@ -10,7 +10,7 @@ from utils import default_command, logger
 @default_command
 @click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
 @click.argument('role',required=True, type=str)
-def rep_add_subject(session_file:str, role:str):
+def rep_add_role(session_file:str, role:str):
     
     with open(session_file, 'r') as f:
         session = f.read().strip()
@@ -30,4 +30,4 @@ def rep_add_subject(session_file:str, role:str):
 
 
 if __name__ == '__main__':
-    rep_add_subject()
+    rep_add_role()
