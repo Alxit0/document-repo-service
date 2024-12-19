@@ -34,7 +34,12 @@ def verify_args(required_fields):
             # Validate required fields
             needed_fields = []
             for field in required_fields:
-                if field not in data:
+                
+                if type(field) is list:
+                    if sum(i in data for i in field) != 1:
+                        needed_fields.append(' | '.join(field))
+
+                elif field not in data:
                     needed_fields.append(field)
 
             if needed_fields:
@@ -803,11 +808,106 @@ def assume_role():
     finally:
         cur.close()
 
-
-@app.route("/ping")
+@app.route("/role/add_permission", methods=["PUT"])
 @secure_endpoint()
 @verify_session()
-@verify_args(["name"])
+@verify_args(['role', 'target'])
+def add_permission():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org_id = session_data['org']
+
+    data = request.decrypted_params
+    role: str = data['role']
+    target: str = data['target']
+
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("SELECT id FROM permissions WHERE name = ?", (target,))
+        is_permission = cur.fetchone() is None
+
+        if is_permission:
+            cur.execute("""
+                INSERT INTO subject_roles (subject_id, role_id)
+                VALUES (
+                    (SELECT id FROM subjects WHERE username = ? AND org = ?),
+                    (SELECT id FROM roles WHERE name = ? AND organization_id = ?)
+                );
+            """, (target, org_id, role, org_id))
+            resp = jsonify({"status": "success", "message": f"User '{target}' can now be '{role}'."}), 200
+
+        else:
+            cur.execute("""
+                INSERT INTO role_permissions (role_id, permission_id)
+                VALUES (
+                    (SELECT id FROM roles WHERE name = ? AND organization_id = ?),
+                    (SELECT id FROM permissions WHERE name = ?)
+                );
+            """, (role, org_id, target))
+            resp = jsonify({"status": "success", "message": f"Role '{target}' has now the '{target}' permission."}), 200
+                
+        db.commit()
+        return resp
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+@app.route("/role/remove_permission", methods=["DELETE"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role', ['username', 'permission']])
+def remove_permission():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org_id = session_data['org']
+
+    data = request.decrypted_params
+    role: str = data['role']
+    target: str = data['target']
+
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("SELECT id FROM permissions WHERE name = ?", (target,))
+        is_permission = cur.fetchone() is None
+
+        if is_permission:
+            cur.execute("""
+                DELETE FROM subject_roles
+                WHERE 
+                    subject_id = (SELECT id FROM subjects WHERE username = ? AND org = ?) AND
+                    role_id = (SELECT id FROM roles WHERE name = ? and organization_id = ?);
+            """, (target, org_id, role, org_id))
+            resp = jsonify({"status": "success", "message": f"User '{target}' no longer can be '{role}'."}), 200
+
+        else:
+            cur.execute("""
+                DELETE FROM role_permissions
+                WHERE 
+                    role_id = (SELECT id FROM roles WHERE name = ? AND organization_id = ?) AND 
+                    permission_id = (SELECT id FROM permissions WHERE name = ?);
+            """, (role, org_id, target))
+            resp = jsonify({"status": "success", "message": f"Role '{target}' no longer has the '{target}' permission."}), 200
+                
+        db.commit()
+        return resp
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@app.route("/ping")
 def ping():
     return jsonify({"status": "up"}), 200
 
