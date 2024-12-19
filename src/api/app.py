@@ -733,6 +733,37 @@ def activate_subject():
 
 
 # role / permission enpoints
+@app.route("/role/add", methods=["POST"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role'])
+def add_role():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    usr_id = session_data['usr']
+    org_id = session_data['org']
+
+    data = request.decrypted_params
+    role = data['role']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+
+        cur.execute("""
+            INSERT INTO roles (name, organization_id) VALUES
+            (?, ?)
+        """, (role, org_id))
+
+        db.commit()
+        return jsonify({"status": "success", "message": f"Role {role} has been added."}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
 @app.route("/role/assume", methods=["POST"])
 @secure_endpoint()
 @verify_session()
