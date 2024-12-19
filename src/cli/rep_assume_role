@@ -25,8 +25,16 @@ def rep_add_subject(session_file:str, role:str):
     }
 
     res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/role/assume", headers=headers, json=body)
+    
+    if res.status_code != 200:
+        logger.info(res.content.decode())
+        return
+    
+    data = json.loads(res.content)
 
-    logger.info(json.loads(res.content))
+    logger.info("New token: " + data['session_token'])
+    with open(session_file, "+w") as file:
+        file.write(data['session_token'])
 
 
 if __name__ == '__main__':

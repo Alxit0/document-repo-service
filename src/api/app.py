@@ -780,17 +780,20 @@ def assume_role():
     data = request.decrypted_params
     role: str = data['role']
 
+    if role in session_data.get('role', []):
+        return jsonify({"status": "success", "message": "User already has that role"}), 203
+
     db = get_db()
     cur = db.cursor()
 
     try:
         cur.execute("""
-            SELECT r.name AS role_name
+            SELECT r.name
             FROM subject_roles sr
             JOIN roles r ON sr.role_id = r.id
             WHERE sr.subject_id = ? AND sr.status = TRUE;
         """, (usr,))
-        subject_allowed_roles = cur.fetchall()
+        subject_allowed_roles = list(map(lambda x:x[0], cur.fetchall()))
 
         if role.lower() not in map(str.lower, subject_allowed_roles):
             return jsonify({"error": "Subject does not have permission for this role."}), 202
