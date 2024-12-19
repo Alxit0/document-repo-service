@@ -861,7 +861,7 @@ def add_permission():
 @app.route("/role/remove_permission", methods=["DELETE"])
 @secure_endpoint()
 @verify_session()
-@verify_args(['role', ['username', 'permission']])
+@verify_args(['role', 'target'])
 def remove_permission():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']

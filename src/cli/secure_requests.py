@@ -233,6 +233,37 @@ def secure_put(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
     # decrypt response
     return prepare_response(response)
 
+def secure_delete(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
+    check_secure_key()
+
+    # encrypt data
+    if data:
+        new_headers, body = prepare_data(headers, data, "data")
+    elif json:
+        new_headers, body = prepare_data(headers, json, "json")
+    else:
+        new_headers, body = prepare_data(headers, {}, "json")
+
+    # make request
+    response = requests.delete(
+        url, 
+        headers=new_headers,
+        **body,
+        files=files
+    )
+
+    # status_code 201 to skip decryption
+    if response.status_code == 201:
+        return response
+    
+    # regnociar keys
+    if response.status_code == 101 and _lvl < 2:
+        check_secure_key(force=True)
+        return secure_delete(url, headers, data, json, files, _lvl=_lvl+1)
+
+    # decrypt response
+    return prepare_response(response)
+
 
 def _example():
     # Example usage
