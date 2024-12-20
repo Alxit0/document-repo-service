@@ -1090,6 +1090,50 @@ def list_role_permissions():
     finally:
         cur.close()
 
+@app.route("/role/list_permission_roles", methods=["GET"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['permission'])
+def list_permission_roles():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    permission: str = data['permission']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                r.name, 
+                r.status
+            FROM roles r
+            JOIN role_permissions rp ON rp.role_id = r.id
+            JOIN permissions p ON p.id = rp.permission_id
+            WHERE 
+                p.name = ? AND
+                r.organization_id = ?;
+        """, (permission, org))
+
+        roles_with_permission = cur.fetchall()
+
+        payload_res = [
+            {"name": row[0], "status": row[1]}
+            for row in roles_with_permission
+        ]
+
+        db.commit()
+        return jsonify({"status": "success", "roles": payload_res}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
 
 @app.route("/ping")
 def ping():
