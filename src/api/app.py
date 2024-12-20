@@ -1006,6 +1006,50 @@ def list_role_subjects():
     finally:
         cur.close()
 
+@app.route("/role/list_subject_roles", methods=["GET"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['username'])
+def list_subject_roles():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    username: str = data['username']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                r.name, 
+                r.status
+            FROM roles r
+            JOIN subject_roles sr ON r.id = sr.role_id
+            JOIN subjects s ON sr.subject_id = s.id
+            WHERE 
+                s.username = ? AND
+                s.org = ?;
+        """, (username, org))
+
+        roles_of_subject = cur.fetchall()
+
+        payload_res = [
+            {"name": row[0], "status": row[1]}
+            for row in roles_of_subject
+        ]
+
+        db.commit()
+        return jsonify({"status": "success", "roles": payload_res}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
 
 @app.route("/ping")
 def ping():
