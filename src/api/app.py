@@ -71,23 +71,31 @@ def verify_session():
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
             
+            #
+
             return func(*args, **kwargs)
         
         return wrapper
     
     return decorator
 
-def verify_permission(required_permissions: List[str]):
+def verify_permission(required_permissions: List[str], choser=lambda x:0):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             session_data = extrat_token_info(request.decrypted_headers['session'])
-            session_roles = session_data.get('roles', [])
+            session_roles = session_data.get('role', [])
             org = session_data['org']
+            
+            # print(session_roles)
+            if len(session_roles) == 0:
+                return jsonify({"error": "Session does not have necessary permissions"}), 402
             
             # manager has overwrite
             if 'Manager' in session_roles:
                 return func(*args, **kwargs)
+
+            target = required_permissions[choser(request.decrypted_params)]
 
             db = get_db()
             cur = db.cursor()
@@ -99,11 +107,11 @@ def verify_permission(required_permissions: List[str]):
                     FROM permissions p 
                     JOIN role_permissions rp ON rp.permission_id = p.id
                     JOIN roles r ON r.id = rp.role_id
-                    WHERE r.name IN ({placeholders}) AND r.organization_id = ?;
+                    WHERE r.name = ({placeholders}) AND r.organization_id = ?;
                 """, (*session_roles, org))
                 session_permissions = set(row[0] for row in cur.fetchall())
 
-                if any(i not in session_permissions for i in required_permissions):
+                if target not in session_permissions:
                     return jsonify({"error": "Session does not have necessary permissions"}), 402
 
                 db.commit()
@@ -228,29 +236,22 @@ def org_create():
     public_key = data['public_key']
 
     try:
+        # create the user
+        cur.execute("""
+            INSERT INTO 
+                subjects (username, full_name, email, public_key) 
+            VALUES 
+                (?, ?, ?, ?);"""
+            , (username, name, email, public_key)
+        )
+        user_id = cur.lastrowid
+
         # create org
-        cur.execute("INSERT INTO organizations (name) VALUES (?);", (organization,))
+        cur.execute("INSERT INTO organizations (name, created_by) VALUES (?, ?);", (organization, user_id))
         org_id = cur.lastrowid
 
-        # get user id
-        cur.execute("SELECT id FROM subjects WHERE username=?", (username,))
-        user_id = cur.fetchone()
-
-        # check if user exists
-        if user_id is None:
-            cur.execute("""
-                INSERT INTO 
-                    subjects (username, full_name, email, public_key, org) 
-                VALUES 
-                    (?, ?, ?, ?, ?);"""
-                , (username, name, email, public_key, org_id)
-            )
-            user_id = cur.lastrowid
-        else:
-            user_id = user_id[0]
-
-        # update organization
-        cur.execute("UPDATE organizations SET created_by = ? WHERE id = ?;", (user_id, org_id))
+        # update user
+        cur.execute("UPDATE subjects SET org = ? WHERE id = ?;", (org_id, user_id))
         
         db.commit()
 

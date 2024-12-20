@@ -125,6 +125,26 @@ CREATE TABLE organization_acls (
     UNIQUE (organization_id, role_id, permission_id) -- Ensure unique permission per organization and role
 );
 
+CREATE TRIGGER assign_manager_role_on_org_creation
+AFTER INSERT ON organizations
+BEGIN
+    -- Insert the 'Manager' role for the new organization
+    INSERT INTO roles (name, organization_id)
+    VALUES ('Manager', NEW.id);
+
+    -- Assign the 'Manager' role to the creator (created_by)
+    INSERT INTO subject_roles (subject_id, role_id)
+    SELECT NEW.created_by, roles.id
+    FROM roles
+    WHERE roles.name = 'Manager' AND roles.organization_id = NEW.id;
+
+    -- Assign all permissions to the 'Manager' role
+    INSERT INTO role_permissions (role_id, permission_id)
+    SELECT roles.id, permissions.id
+    FROM roles, permissions
+    WHERE roles.name = 'Manager' AND roles.organization_id = NEW.id;
+END;
+
 -- Insert permissions related to document management
 INSERT INTO permissions (name) VALUES 
     ('DOC_ACL'),
