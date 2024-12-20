@@ -1167,6 +1167,76 @@ def role_status():
     finally:
         cur.close()
 
+@app.route("/role/acl_doc/add", methods=["PUT"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['document_name', 'role', 'permission'])
+def acl_doc_add():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    document_name: str = data['document_name']
+    role: str = data['role']
+    permission: bool = data['permission']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            INSERT INTO document_acls (document_id, role_id, permission_id)
+            VALUES (
+                (SELECT id FROM documents WHERE name = ? AND organization_id = ?),
+                (SELECT id FROM roles WHERE name = ? AND organization_id = ?),
+                (SELECT id FROM permissions WHERE name = ?)
+            );
+        """, (document_name, org, role, org, permission))
+
+        db.commit()
+        return jsonify({"status": "success", "message": f"Role '{role}' has now the '{permission}' permission for '{document_name}' document."}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+@app.route("/role/acl_doc/remove", methods=["DELETE"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['document_name', 'role', 'permission'])
+def acl_doc_remove():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    document_name: str = data['document_name']
+    role: str = data['role']
+    permission: bool = data['permission']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            DELETE FROM document_acls
+            WHERE 
+                document_id = (SELECT id FROM documents WHERE name = ? AND organization_id = ?) AND
+                role_id = (SELECT id FROM roles WHERE name = ? AND organization_id = ?) AND 
+                permission_id = (SELECT id FROM permissions WHERE name = ?);
+        """, (document_name, org, role, org, permission))
+
+        db.commit()
+        return jsonify({"status": "success", "message": f"Role '{role}' no longer has the '{permission}' permission for '{document_name}' document."}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
 
 @app.route("/ping")
 def ping():

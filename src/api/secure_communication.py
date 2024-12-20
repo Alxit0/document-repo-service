@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, hmac, serialization
 from cryptography.hazmat.primitives.serialization import load_pem_parameters
+from cryptography.exceptions import InvalidSignature
 import base64
 import os
 
@@ -91,7 +92,11 @@ def secure_endpoint():
                 shared_secret_key = client_shared_keys[client_id]
 
                 # verify the HMAC
-                verify_hmac(payload, shared_secret_key, received_hmac)
+                try:
+                    verify_hmac(payload, shared_secret_key, received_hmac)
+                except InvalidSignature as e:
+                    print("Invalid signature")
+                    return jsonify({"error": "Need to regnociate secret_key"}), 101
 
                 # decrypt the payload and nessessary headers
                 decrypted_params = decrypt_message(payload, shared_secret_key, iv).decode()
