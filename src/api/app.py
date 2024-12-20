@@ -1,4 +1,5 @@
 import base64
+from typing import List
 from cryptography.hazmat.primitives import serialization, hashes
 from datetime import datetime
 from functools import wraps
@@ -76,13 +77,45 @@ def verify_session():
     
     return decorator
 
-def verify_permission(required_permission):
+def verify_permission(required_permissions: List[str]):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            session_data = extrat_token_info(request.decrypted_headers['session'])
+            session_roles = session_data.get('roles', [])
+            org = session_data['org']
             
-            return func(*args, **kwargs)
-        
+            # manager has overwrite
+            if 'Manager' in session_roles:
+                return func(*args, **kwargs)
+
+            db = get_db()
+            cur = db.cursor()
+            
+            try:
+                placeholders = ', '.join(['?'] * len(session_roles))
+                cur.execute(f"""
+                    SELECT p.name
+                    FROM permissions p 
+                    JOIN role_permissions rp ON rp.permission_id = p.id
+                    JOIN roles r ON r.id = rp.role_id
+                    WHERE r.name IN ({placeholders}) AND r.organization_id = ?;
+                """, (*session_roles, org))
+                session_permissions = set(row[0] for row in cur.fetchall())
+
+                if any(i not in session_permissions for i in required_permissions):
+                    return jsonify({"error": "Session does not have necessary permissions"}), 402
+
+                db.commit()
+                return func(*args, **kwargs)
+            
+            except Exception as e:
+                db.rollback()
+                return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+            
+            finally:
+                cur.close()
+
         return wrapper
     
     return decorator
@@ -311,8 +344,8 @@ def authenticate():
 @app.route("/file/upload", methods=['POST'])
 @secure_endpoint()
 @verify_session()
-@verify_permission("DOC_NEW")
 @verify_args(["name", "file_handle", "algorithm", "encryption_key", "iv", "nonce"])
+@verify_permission(["DOC_NEW"])
 def upload_file():
 
     # Check if the document file is part of the request
@@ -457,6 +490,7 @@ def list_docs():
 
 @app.route("/file/download/<file_handle>")
 @secure_endpoint()
+@verify_permission(["DOC_READ"])
 def get_file(file_handle: str):
 
     file_path = os.path.join(REPO_PATH, file_handle)
@@ -470,6 +504,7 @@ def get_file(file_handle: str):
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
+@verify_permission(["DOC_READ"])
 def get_doc_metadata():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -527,6 +562,7 @@ def get_doc_metadata():
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
+@verify_permission(["DOC_DELETE"])
 def delete_file():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -576,6 +612,7 @@ def delete_file():
 @secure_endpoint()
 @verify_session()
 @verify_args(["username", "name", "email", 'public_key'])
+@verify_permission(['SUBJECT_NEW'])
 def add_subject():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
@@ -675,6 +712,7 @@ def list_subjects():
 @secure_endpoint()
 @verify_session()
 @verify_args(["username"])
+@verify_permission(['SUBJECT_DOWN'])
 def suspend_subject():
 
     session_data = extrat_token_info(request.decrypted_headers['session'])
@@ -708,6 +746,7 @@ def suspend_subject():
 @secure_endpoint()
 @verify_session()
 @verify_args(["username"])
+@verify_permission(['SUBJECT_UP'])
 def activate_subject():
 
     session_data = extrat_token_info(request.decrypted_headers['session'])
@@ -742,6 +781,7 @@ def activate_subject():
 @secure_endpoint()
 @verify_session()
 @verify_args(['role'])
+@verify_permission(['ROLE_NEW'])
 def add_role():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     usr_id = session_data['usr']
@@ -832,6 +872,7 @@ def drop_role():
 @secure_endpoint()
 @verify_session()
 @verify_args(['role', 'target'])
+@verify_permission(['ROLE_MOD'])
 def add_permission():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
@@ -882,6 +923,7 @@ def add_permission():
 @secure_endpoint()
 @verify_session()
 @verify_args(['role', 'target'])
+@verify_permission(['ROLE_MOD'])
 def remove_permission():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org_id = session_data['org']
@@ -1138,6 +1180,7 @@ def list_permission_roles():
 @secure_endpoint()
 @verify_session()
 @verify_args(['role', 'status'])
+@verify_permission(['ROLE_DOWN', 'ROLE_UP'], choser=lambda x: x['status'] == True)
 def role_status():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org = session_data['org']
@@ -1171,6 +1214,7 @@ def role_status():
 @secure_endpoint()
 @verify_session()
 @verify_args(['document_name', 'role', 'permission'])
+@verify_permission(['DOC_ACL'])
 def acl_doc_add():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org = session_data['org']
@@ -1207,6 +1251,7 @@ def acl_doc_add():
 @secure_endpoint()
 @verify_session()
 @verify_args(['document_name', 'role', 'permission'])
+@verify_permission(['DOC_ACL'])
 def acl_doc_remove():
     session_data = extrat_token_info(request.decrypted_headers['session'])
     org = session_data['org']
