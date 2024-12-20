@@ -828,8 +828,6 @@ def drop_role():
 
     return jsonify({"status": "success", "session_token": write_token(session_data)}), 200
 
-
-
 @app.route("/role/add_permission", methods=["PUT"])
 @secure_endpoint()
 @verify_session()
@@ -920,6 +918,40 @@ def remove_permission():
                 
         db.commit()
         return resp
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+@app.route("/role/list", methods=["GET"])
+@secure_endpoint()
+@verify_session()
+def list_roles():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT name, status
+            FROM roles
+            WHERE organization_id = ?;
+        """, (org,))
+
+        roles_in_org = cur.fetchall()
+
+        payload_res = [
+            {"name": row[0], "status": row[1]}
+            for row in roles_in_org
+        ]
+
+        db.commit()
+        return jsonify({"status": "success", "roles": payload_res}), 200
     
     except Exception as e:
         db.rollback()
