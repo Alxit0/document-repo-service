@@ -866,7 +866,7 @@ def add_permission():
                     (SELECT id FROM permissions WHERE name = ?)
                 );
             """, (role, org_id, target))
-            resp = jsonify({"status": "success", "message": f"Role '{target}' has now the '{target}' permission."}), 200
+            resp = jsonify({"status": "success", "message": f"Role '{role}' has now the '{target}' permission."}), 200
                 
         db.commit()
         return resp
@@ -1042,6 +1042,46 @@ def list_subject_roles():
 
         db.commit()
         return jsonify({"status": "success", "roles": payload_res}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
+@app.route("/role/list_permissions", methods=["GET"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role'])
+def list_role_permissions():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    role: str = data['role']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                p.name
+            FROM permissions p
+            JOIN role_permissions rp ON rp.permission_id = p.id
+            JOIN roles r ON r.id = rp.role_id
+            WHERE 
+                r.name = ? AND
+                r.organization_id = ?;
+        """, (role, org))
+
+        permissions_of_role = cur.fetchall()
+
+        payload_res = [row[0] for row in permissions_of_role]
+
+        db.commit()
+        return jsonify({"status": "success", "permissions": payload_res}), 200
     
     except Exception as e:
         db.rollback()

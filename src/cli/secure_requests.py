@@ -228,7 +228,7 @@ def secure_put(url, headers=None, data=None, json=None, files=None, *, _lvl=0):
     # regnociar keys
     if response.status_code == 101 and _lvl < 2:
         check_secure_key(force=True)
-        return secure_post(url, headers, data, json, files, _lvl=_lvl+1)
+        return secure_put(url, headers, data, json, files, _lvl=_lvl+1)
 
     # decrypt response
     return prepare_response(response)
