@@ -1134,6 +1134,39 @@ def list_permission_roles():
     finally:
         cur.close()
 
+@app.route("/role/status", methods=["PUT"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role', 'status'])
+def role_status():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+    org = session_data['org']
+
+    data = request.decrypted_params
+    role: str = data['role']
+    status: bool = data['status']
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        cur.execute("""
+            UPDATE roles
+            SET status = ?
+            WHERE name = ? and organization_id = ?;
+        """, (status, role, org))
+
+        role_status = 'now active' if status else 'no longer active'
+        db.commit()
+        return jsonify({"status": "success", "message": f"Role '{role}' is {role_status}"}), 200
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    
+    finally:
+        cur.close()
+
 
 @app.route("/ping")
 def ping():
