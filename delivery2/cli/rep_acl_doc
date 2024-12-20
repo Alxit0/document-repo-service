@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+import json
+import click
+import secure_requests
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('document_name',required=True, type=str)
+@click.argument('operation', type=click.Choice(['+', '-'], case_sensitive=True))
+@click.argument('role',required=True, type=str)
+@click.argument('permission',required=True, type=str)
+def rep_acl_doc(session_file:str, document_name:str, operation:str, role:str, permission:str):
+    
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+    headers = {
+        "session": session
+    }
+
+    body = {
+        "document_name": document_name,
+        "role": role,
+        "permission": permission
+    }
+
+    if operation == '+':
+        res = secure_requests.secure_put(f"http://{utils.state['REP_ADDRESS']}/role/acl_doc/add", headers=headers, json=body)
+    elif operation == '-':
+        res = secure_requests.secure_delete(f"http://{utils.state['REP_ADDRESS']}/role/acl_doc/remove", headers=headers, json=body)
+    else:
+        logger.info("Invalid operation (+ | -)")
+        return 1
+
+    if res.status_code != 200:
+        logger.info(res.content.decode())
+        return
+
+    data = json.loads(res.content)
+    logger.info(data['message'])
+
+
+if __name__ == '__main__':
+    rep_acl_doc()

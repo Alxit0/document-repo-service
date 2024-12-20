@@ -1,0 +1,41 @@
+curl http://127.0.0.1:5000/jail-house-lock
+
+python.exe rep_subject_credentials ola123 user1.creds
+python.exe rep_subject_credentials ola124 user2.creds
+
+python.exe rep_create_org sal-aveiro Alxito "Alexandre R." alex@sal.com user1.creds
+
+python.exe rep_create_session sal-aveiro Alxito ola123 .\user1.creds .\user1_session.ses
+python.exe .\rep_add_subject .\user1_session.ses Benny "Bernardo B." bnney@sal.com .\user2.creds
+python.exe rep_create_session sal-aveiro Benny ola124 .\user2.creds .\user2_session.ses
+
+python.exe rep_add_role .\user1_session.ses Testers
+python.exe rep_add_role .\user1_session.ses Cruzaders
+python.exe .\rep_list_roles .\user1_session.ses
+
+python.exe rep_add_permission .\user1_session.ses Testers Alxito
+python.exe rep_add_permission .\user1_session.ses Testers Benny
+python.exe rep_add_permission .\user1_session.ses Cruzaders Alxito
+
+python.exe rep_add_permission .\user1_session.ses Testers DOC_ACL
+python.exe rep_add_permission .\user1_session.ses Cruzaders DOC_ACL
+
+python.exe rep_assume_role .\user1_session.ses Manager
+python.exe rep_assume_role .\user1_session.ses Testers
+python.exe rep_assume_role .\user1_session.ses Cruzaders
+python.exe rep_assume_role .\user2_session.ses Testers
+
+python.exe .\rep_list_roles .\user1_session.ses
+
+python.exe rep_remove_permission .\user1_session.ses Testers Alxito
+
+python.exe .\rep_list_subject_roles .\user1_session.ses Alxito
+
+python.exe .\rep_suspend_role .\user1_session.ses Cruzaders
+
+python.exe .\rep_reactivate_role .\user1_session.ses Cruzaders
+
+
+python.exe .\rep_add_doc .\user1_session.ses temp.md .\README.md
+python.exe .\rep_acl_doc .\user1_session.ses temp.md + Testers DOC_READ
+python.exe .\rep_acl_doc .\user1_session.ses temp.md - Testers DOC_REA
