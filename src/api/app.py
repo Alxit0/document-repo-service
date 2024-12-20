@@ -1159,13 +1159,31 @@ def list_permission_roles():
                 p.name = ? AND
                 r.organization_id = ?;
         """, (permission, org))
-
         roles_with_permission = cur.fetchall()
+
+        cur.execute("""
+            SELECT
+                r.name, 
+                r.status,
+                d.name
+            FROM roles r
+            JOIN document_acls da ON da.role_id = r.id
+            JOIN permissions p ON p.id = da.permission_id
+            JOIN documents d ON d.id = da.document_id
+            WHERE 
+                p.name = ? AND
+                r.organization_id = ?;
+        """, (permission, org))
+        roles_with_permission_doc = cur.fetchall()
 
         payload_res = [
             {"name": row[0], "status": row[1]}
             for row in roles_with_permission
         ]
+        payload_res.extend([
+            {"name": row[0], "status": row[1], "doc":row[2]}
+            for row in roles_with_permission_doc
+        ])
 
         db.commit()
         return jsonify({"status": "success", "roles": payload_res}), 200
