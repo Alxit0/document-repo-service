@@ -811,6 +811,25 @@ def assume_role():
     finally:
         cur.close()
 
+@app.route("/role/drop", methods=["PUT"])
+@secure_endpoint()
+@verify_session()
+@verify_args(['role'])
+def drop_role():
+    session_data = extrat_token_info(request.decrypted_headers['session'])
+
+    data = request.decrypted_params
+    role: str = data['role']
+
+    if 'role' not in session_data or role not in session_data['role']:
+        return jsonify({"status": "success", "message": "User does not have that role."}), 202
+
+    session_data['role'].remove(role)
+
+    return jsonify({"status": "success", "session_token": write_token(session_data)}), 200
+
+
+
 @app.route("/role/add_permission", methods=["PUT"])
 @secure_endpoint()
 @verify_session()
