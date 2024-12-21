@@ -330,3 +330,494 @@ This command uses the session token from `session_file` to authenticate the requ
 - The command sends a PUT request with the document name in the request body for deletion.
 - After the request is made, the response from the server is logged.
 - Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_add_role`
+The `rep_add_role` command adds a new role to the system. It requires a valid session token and the name of the role to be added.
+
+### Usage
+```bash
+rep_add_role [OPTIONS] <session_file> <role>
+```
+
+This command uses the session token from `session_file` to authenticate the request and adds the specified `role` to the system.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `role` (required): The name of the role to be added.
+
+### Notes
+- The server endpoint for adding a role is `http://{utils.state['REP_ADDRESS']}/role/add`.
+- The command sends a POST request with the role name in the request body.
+- After the request is made, the server's response is logged.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_add_permission`
+The `rep_add_permission` command assigns a permission to a specified role for a given target. It requires a valid session token, a role name, and the target resource for the permission.
+
+### Usage
+```bash
+rep_add_permission [OPTIONS] <session_file> <role> <target>
+```
+
+This command uses the session token from `session_file` to authenticate the request and assigns the permission for the `role` on the specified `target`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `role` (required): The name of the role to which the permission will be added.
+- `target` (required): The target resource or action for which the permission will be granted.
+
+### Notes
+- The server endpoint for adding permissions is `http://{utils.state['REP_ADDRESS']}/role/add_permission`.
+- The command sends a PUT request with the role and target in the request body.
+- After the request is made, the server's response is logged.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_remove_permission`
+The `rep_remove_permission` command removes a permission from a specified role for a given target. It requires a valid session token, a role name, and the target resource for the permission.
+
+### Usage
+```bash
+rep_remove_permission [OPTIONS] <session_file> <role> <target>
+```
+
+This command uses the session token from `session_file` to authenticate the request and removes the permission for the `role` on the specified `target`.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+- `role` (required): The name of the role from which the permission will be removed.
+- `target` (required): The target resource or action from which the permission will be revoked.
+
+### Notes
+- The server endpoint for removing permissions is `http://{utils.state['REP_ADDRESS']}/role/remove_permission`.
+- The command sends a DELETE request with the role and target in the request body.
+- After the request is made, the server's response is logged.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_add_subject`
+The `rep_add_subject` command allows a user to assume a specified role and obtain a new session token associated with that role. The new token is written back to the session file.
+
+### Usage
+```bash
+rep_add_subject [OPTIONS] <session_file> <role>
+```
+
+This command uses the session token from `session_file` to authenticate the request and attempts to assume the `role` specified.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token. The file will be updated with the new session token upon success.
+- `role` (required): The role that the user wishes to assume.
+
+### Notes
+- The server endpoint for assuming a role is `http://{utils.state['REP_ADDRESS']}/role/assume`.
+- The command sends a POST request with the role in the request body.
+- If successful, the new session token is logged and written to the `session_file`.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_drop_role`
+The `rep_drop_role` command allows a user to drop a specified role and obtain a new session token that excludes the dropped role. The new token is updated in the session file.
+
+### Usage
+```bash
+rep_drop_role [OPTIONS] <session_file> <role>
+```
+
+This command uses the session token from `session_file` to authenticate the request and drops the specified `role` from the session.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token. The file will be updated with the new session token upon success.
+- `role` (required): The role to be dropped from the current session.
+
+### Notes
+- The server endpoint for dropping a role is `http://{utils.state['REP_ADDRESS']}/role/drop`.
+- The command sends a PUT request with the role in the request body.
+- Upon success, the new session token is logged and written to the `session_file`.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to the correct server address.
+
+## Command: `rep_list_roles`
+The `rep_list_roles` command lists all roles associated with the current session, displaying their status (active or suspended) and name.
+
+### Usage
+```bash
+rep_list_roles [OPTIONS] <session_file>
+```
+
+This command retrieves and prints a sorted list of roles, with active roles displayed first.
+
+### Parameters
+- `session_file` (required): Path to the file containing the session token. This file must exist and include a valid session token.
+
+### Output
+- The roles are displayed in a table format with two columns: `Status` and `Name`.
+- Status is shown as `Active` or `Suspended`.
+
+### Notes
+- The server endpoint for listing roles is `http://{utils.state['REP_ADDRESS']}/role/list`.
+- Roles are sorted by their status, with active roles appearing first.
+- Ensure that `utils.state['REP_ADDRESS']` is correctly configured to point to the server.
+
+## Command: `rep_list_role_subjects`
+
+The `rep_list_role_subjects` command retrieves and displays the list of subjects (users) assigned to a specific role, along with their status.
+
+---
+
+### Usage
+```bash
+rep_list_role_subjects [OPTIONS] <session_file> <role>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   Path to the session token file. The file must exist and contain a valid session token.
+   
+2. **`role`** (required):  
+   The name of the role for which to list the subjects.
+
+---
+
+### Output
+- A list of users assigned to the specified role. Each entry includes:
+  - **Username**: The subject's unique identifier.
+  - **Name**: The subject's full name.
+  - **Status**: `Active` or `Suspended`.
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/list_subjects`
+- The command uses the session token to authenticate the request.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to point to the appropriate server.
+
+## Command: `rep_list_subject_roles`
+
+The `rep_list_subject_roles` command retrieves and displays all roles assigned to a specific subject (user), along with their status.
+
+---
+
+### Usage
+```bash
+rep_list_subject_roles [OPTIONS] <session_file> <username>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   Path to the session token file. The file must exist and contain a valid session token.
+   
+2. **`username`** (required):  
+   The username of the subject whose roles are to be listed.
+
+---
+
+### Output
+- A list of roles assigned to the specified subject. Each entry includes:
+  - **Status**: `Active` or `Suspended`.
+  - **Name**: The name of the role.
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/list_subject_roles`
+- The command uses the session token to authenticate the request.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to point to the appropriate server.
+
+## Command: `rep_list_role_permissions`
+
+The `rep_list_role_permissions` command is used to retrieve and display the permissions associated with a specified role.
+
+---
+
+### Usage
+```bash
+rep_list_role_permissions [OPTIONS] <session_file> <role>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   Path to the session token file. The file must exist and contain a valid session token for authentication.
+
+2. **`role`** (required):  
+   The name of the role whose permissions you want to list.
+
+---
+
+### Output
+- A list of permissions assigned to the specified role.
+  - Each permission will be listed on a new line, prefixed by a tab for formatting.
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/list_permissions`
+- The command uses the session token for authentication and the provided role to fetch the permissions.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to point to the appropriate server.
+
+## Command: `rep_list_permission_roles`
+
+The `rep_list_permission_roles` command is used to retrieve and display the roles that have a specific permission. It provides detailed information on each role, including its status and, in some cases, associated document information.
+
+---
+
+### Usage
+```bash
+rep_list_permission_roles [OPTIONS] <session_file> <permission>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   Path to the session token file. The file must exist and contain a valid session token for authentication.
+
+2. **`permission`** (required):  
+   The permission whose associated roles you want to list.
+
+---
+
+### Output
+- A list of roles that have the specified permission.
+  - Each role will include:
+    - **Status**: Whether the role is active or suspended.
+    - **Name**: The name of the role.
+    - If the permission relates to a document, the **Document** column will also be displayed.
+
+---
+
+### Format
+- The command will output the roles in a table format:
+  - If the permission is related to a document, the columns displayed will be **Document**, **Status**, and **Name**.
+  - If the permission is not related to a document, only **Status** and **Name** will be shown.
+
+---
+
+### Example Output (Document Permission)
+```
+Document              | Status     | Name                 
+------------------------------------------------
+document_1.pdf        | Active     | role_1               
+document_2.pdf        | Suspended  | role_2
+```
+
+### Example Output (Non-Document Permission)
+```
+Status     | Name                
+-----------------
+Active     | role_1              
+Suspended  | role_2
+```
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/list_permission_roles`
+- The command uses the session token for authentication and the provided permission to fetch the associated roles.
+- Ensure that `utils.state['REP_ADDRESS']` is configured to point to the appropriate server.
+
+## Command: `rep_suspend_role`
+
+The `rep_suspend_role` command is used to suspend a role within the system. By setting the role's status to `False`, this command effectively deactivates it.
+
+---
+
+### Usage
+```bash
+rep_suspend_role [OPTIONS] <session_file> <role>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   The path to the session token file. The file must exist and contain a valid session token for authentication.
+
+2. **`role`** (required):  
+   The name of the role to be suspended.
+
+---
+
+### Functionality
+- The command reads the session token from the `session_file` to authenticate the request.
+- The role name provided is used to identify which role needs to be suspended.
+- The status of the specified role is set to `False`, which means the role will be suspended in the system.
+- The command then sends a PUT request to update the role's status.
+  
+---
+
+### Response
+- If the request is successful (status code 200), the response will include a message confirming the role suspension.
+- If the request fails, an error message is logged with the response content.
+
+---
+
+### Example Output
+```plaintext
+{
+  "message": "Role 'admin' suspended successfully."
+}
+```
+
+If the request fails:
+```plaintext
+{
+  "error": "Failed to suspend role 'admin'."
+}
+```
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/status`
+- The `status` key in the request body is set to `False`, which indicates that the role should be suspended.
+- The `utils.state['REP_ADDRESS']` should be configured to the correct server address.
+
+## Command: `rep_reactivate_role`
+
+The `rep_reactivate_role` command is used to reactivate a previously suspended role within the system. By setting the role's status to `True`, this command reactivates it.
+
+---
+
+### Usage
+```bash
+rep_reactivate_role [OPTIONS] <session_file> <role>
+```
+
+---
+
+### Parameters
+1. **`session_file`** (required):  
+   The path to the session token file. The file must exist and contain a valid session token for authentication.
+
+2. **`role`** (required):  
+   The name of the role to be reactivated.
+
+---
+
+### Functionality
+- The command reads the session token from the `session_file` to authenticate the request.
+- The role name provided is used to identify which role needs to be reactivated.
+- The status of the specified role is set to `True`, which means the role will be reactivated in the system.
+- The command then sends a PUT request to update the role's status.
+
+---
+
+### Response
+- If the request is successful (status code 200), the response will include a message confirming the role reactivation.
+- If the request fails, an error message is logged with the response content.
+
+---
+
+### Example Output
+```plaintext
+{
+  "message": "Role 'admin' reactivated successfully."
+}
+```
+
+If the request fails:
+```plaintext
+{
+  "error": "Failed to reactivate role 'admin'."
+}
+```
+
+---
+
+### Notes
+- The server endpoint for this functionality is:  
+  `http://{utils.state['REP_ADDRESS']}/role/status`
+- The `status` key in the request body is set to `True`, which indicates that the role should be reactivated.
+- The `utils.state['REP_ADDRESS']` should be configured to the correct server address.
+
+## Command: `rep_acl_doc`
+
+The `rep_acl_doc` command allows for managing document-level permissions for roles. You can add or remove a role's permission for a specific document by performing an access control list (ACL) operation.
+
+---
+
+### Usage
+```bash
+rep_acl_doc [OPTIONS] <session_file> <document_name> <operation> <role> <permission>
+```
+
+---
+
+### Parameters
+
+1. **`session_file`** (required):  
+   The path to the session token file. This file must exist and contain a valid session token for authenticating the request.
+
+2. **`document_name`** (required):  
+   The name of the document for which the ACL operation is being applied.
+
+3. **`operation`** (required):  
+   The operation to be performed, which can either be:
+   - `+` to **add** the permission.
+   - `-` to **remove** the permission.
+
+4. **`role`** (required):  
+   The name of the role for which the permission is being granted or revoked.
+
+5. **`permission`** (required):  
+   The permission to be added or removed for the role (e.g., `read`, `write`, etc.).
+
+---
+
+### Functionality
+
+- The command reads the session token from the `session_file` to authenticate the request.
+- Based on the operation (`+` or `-`), the command will either add or remove the specified permission for the given role on the specified document.
+- The operation is performed by sending either a `PUT` request (to add the permission) or a `DELETE` request (to remove the permission) to the corresponding endpoint.
+
+---
+
+### Example Usage
+
+**To add a permission for a role:**
+```bash
+rep_acl_doc session.txt document1 + admin read
+```
+This will add the `read` permission for the `admin` role on `document1`.
+
+**To remove a permission for a role:**
+```bash
+rep_acl_doc session.txt document1 - admin write
+```
+This will remove the `write` permission for the `admin` role on `document1`.
+
+---
+
+### Response
+
+- If the request is successful (status code 200), the response will contain a message confirming the operation was completed.
+  
+  **Example:**
+  ```json
+  {
+    "message": "Permission 'read' added to role 'admin' for document 'document1'."
+  }
+  ```
+
+- If the request fails, an error message will be logged with the response content.
+
+---
+
+### Notes
+
+- **Endpoints:**
+  - Add permission: `http://{utils.state['REP_ADDRESS']}/role/acl_doc/add`
+  - Remove permission: `http://{utils.state['REP_ADDRESS']}/role/acl_doc/remove`
+  
+- The `utils.state['REP_ADDRESS']` should be correctly configured with the address of the server handling the requests.
+  
+- If the operation is invalid (anything other than `+` or `-`), the command will log an error message and terminate the operation.
+
