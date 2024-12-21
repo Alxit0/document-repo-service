@@ -734,6 +734,17 @@ def suspend_subject():
     cur = db.cursor()
 
     try:
+        cur.execute("""
+            SELECT r.name 
+            FROM roles r 
+            JOIN subject_roles sr ON r.id = sr.role_id
+            JOIN subjects s ON sr.subject_id = s.id
+            WHERE s.username = ?;
+        """, (username,))
+        roles_of_target = [i[0] for i in cur.fetchall()]
+
+        if 'Manager' in roles_of_target:
+            raise Exception("User is a Manager (cannot be suspended)")
 
         cur.execute("""
             UPDATE subjects
@@ -1225,6 +1236,9 @@ def role_status():
     data = request.decrypted_params
     role: str = data['role']
     status: bool = data['status']
+
+    if role == 'Manager':
+        return jsonify({"error": "Internal Server Error", "message": "The status of 'Manager' is always active"})
 
     db = get_db()
     cur = db.cursor()
