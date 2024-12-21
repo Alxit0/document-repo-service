@@ -916,6 +916,11 @@ def add_permission():
                     (SELECT id FROM permissions WHERE name = ?)
                 );
             """, (role, org_id, target))
+
+            # in case of adding a Manager
+            if role == 'Manager':
+                cur.execute("UPDATE organizations SET active_managers = active_managers + 1 WHERE id = ?;", (org_id,))
+
             resp = jsonify({"status": "success", "message": f"Role '{role}' has now the '{target}' permission."}), 200
                 
         db.commit()
@@ -965,6 +970,11 @@ def remove_permission():
                     role_id = (SELECT id FROM roles WHERE name = ? AND organization_id = ?) AND 
                     permission_id = (SELECT id FROM permissions WHERE name = ?);
             """, (role, org_id, target))
+
+            # in case of removing a Manager
+            if role == 'Manager':
+                cur.execute("UPDATE organizations SET active_managers = active_managers - 1 WHERE id = ?;", (org_id,))
+
             resp = jsonify({"status": "success", "message": f"Role '{target}' no longer has the '{target}' permission."}), 200
                 
         db.commit()
