@@ -3,7 +3,7 @@ CREATE TABLE organizations (
     
     name TEXT NOT NULL UNIQUE,
     created_by INTEGER,  -- creator
-    active_managers DEFAULT 1
+    active_managers DEFAULT 1 CHECK (active_managers >= 1),
     
     FOREIGN KEY (created_by) REFERENCES subjects(id)
 );
@@ -147,9 +147,6 @@ BEGIN
     FROM roles, permissions
     WHERE roles.name = 'Manager' AND roles.organization_id = NEW.id;
 END;
-
-ALTER TABLE organizations
-ADD CONSTRAINT check_active_managers_min CHECK (active_managers >= 1);
 
 -- Insert permissions related to document management
 INSERT INTO permissions (name) VALUES 

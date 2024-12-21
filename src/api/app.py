@@ -586,15 +586,17 @@ def delete_file():
     try:
         # ensure the doc exists and belongs to the user's org
         cur.execute("""
-            SELECT id, handle FROM documents
-            WHERE name = ? AND organization_id = ? AND deleted_by IS NULL
+            SELECT d.id, d.handle, dm.encryption_key, dm.alg, dm.iv, dm.nonce
+            FROM documents d
+            JOIN document_metadata dm ON dm.document_id = d.id
+            WHERE d.name = ? AND d.organization_id = ? AND d.deleted_by IS NULL
         """, (doc_name, org_id))
         document = cur.fetchone()
 
         if not document:
             return jsonify({"error": "Document not found or already deleted"}), 404
 
-        doc_id, handle = document
+        doc_id = document[0]
 
         # update the deleted_by column to indicate soft deletion
         cur.execute("""
@@ -606,7 +608,14 @@ def delete_file():
         # Commit the transaction
         db.commit()
 
-        return jsonify({"status": "success", "handle": handle}), 200
+        return jsonify({
+            "status": "success", 
+            "handle": document[1],
+            "encryption_key": document[2],
+            "algorithm": document[3],
+            "iv": document[4],
+            "nonce": document[5]
+        }), 200
 
     except Exception as e:
         db.rollback()
