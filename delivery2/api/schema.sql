@@ -1,7 +1,10 @@
 CREATE TABLE organizations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
     name TEXT NOT NULL UNIQUE,
     created_by INTEGER,  -- creator
+    active_managers DEFAULT 1 CHECK (active_managers >= 1),
+    
     FOREIGN KEY (created_by) REFERENCES subjects(id)
 );
 

@@ -4,7 +4,7 @@ import click
 import secure_requests
 
 import utils
-from utils import default_command
+from utils import default_command, logger
 
 @default_command
 @click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
@@ -27,9 +27,12 @@ def rep_activate_subject(session_file: str, username: str):
     )
 
     if response.status_code == 200:
-        print(f"Subject '{username}' reactivated successfully.")
+        logger.info(f"Subject '{username}' reactivated successfully.")
+        return 0
     else:
-        print(f"Failed to reactivate subject '{username}':", response.text)
+        logger.info(f"Failed to reactivate subject '{username}':", response.text)
+        return -1
+
 
 if __name__ == '__main__':
     rep_activate_subject()

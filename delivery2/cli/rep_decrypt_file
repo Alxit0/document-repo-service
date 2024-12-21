@@ -26,6 +26,7 @@ def rep_decrypt_file(encrypted_file: str, metadata: str):
     decrypt_file(key, iv, nonce, file_path, algo, mode)
 
     logger.info("File decrypt sucesfully")
+    return 0
 
 
 if __name__ == '__main__':

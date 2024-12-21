@@ -25,8 +25,8 @@ def rep_get_file(file_handle: str, file: str):
     # output
     logger.info(f"File {file_handle} downloaded successfully.")
     if file is None:
-        print(base64.b64encode(response.content).decode())
-        return
+        logger.info(base64.b64encode(response.content).decode())
+        return 0
     
     with open(file, '+wb') as f:
         f.write(response.content)

@@ -29,11 +29,13 @@ def rep_suspend_role(session_file: str, role: str):
 
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
     
     # output
     data = json.loads(res.content)
     logger.info(data['message'])
+
+    return 0
 
 
 if __name__ == '__main__':

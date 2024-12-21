@@ -31,17 +31,19 @@ def rep_get_doc_metadata(session_file: str, document_name: str):
 
     if res.status_code != 200:
         logger.error(f"Failed to fetch metadata for document '{document_name}': {res.text}")
-        return
+        return -1
     
     doc_metadata = json.loads(res.content)
     logger.info(f"Metadata for document '{document_name}':")
-    print(json.dumps(doc_metadata, indent=4))
+    logger.info(json.dumps(doc_metadata, indent=4))
 
     # save to file
     os.makedirs("./metadatas", exist_ok=True)
     out_path = os.path.join("./metadatas", f"{document_name}_meta.json")
     with open(out_path, "w+") as file:
         json.dump(doc_metadata, file)
+    
+    return 0
 
 
 if __name__ == '__main__':

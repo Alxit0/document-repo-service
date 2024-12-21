@@ -32,7 +32,8 @@ def rep_add_subject(session_file:str, role:str):
     
     data = json.loads(res.content)
 
-    logger.info("New token: " + data['session_token'])
+    logger.info(f"User now has the role '{role}'")
+    logger.debug("New token: " + data['session_token'])
     with open(session_file, "+w") as file:
         file.write(data['session_token'])
 

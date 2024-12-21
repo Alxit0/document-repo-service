@@ -32,7 +32,7 @@ def rep_list_permission_roles(session_file: str, permission: str):
 
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
 
     # output
     data = json.loads(res.content)
@@ -56,6 +56,8 @@ def rep_list_permission_roles(session_file: str, permission: str):
             print(f"{doc:<20} | {status:<10} | {name:<20}")
         else:    
             print(f"{status:<10} | {name:<20}")
+    
+    return 0
 
 
 if __name__ == '__main__':

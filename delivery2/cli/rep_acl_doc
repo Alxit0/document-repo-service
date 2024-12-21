@@ -38,10 +38,12 @@ def rep_acl_doc(session_file:str, document_name:str, operation:str, role:str, pe
 
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
 
     data = json.loads(res.content)
     logger.info(data['message'])
+
+    return 0
 
 
 if __name__ == '__main__':
