@@ -72,6 +72,7 @@ Benny can be a 'Contributer'
 Carlos can be a 'Keeper'
 Dinis can be a 'Reader'
 Eren can be a 'Professor'
+Eren can be a 'Reader'
 
 Alxito drops Manager
 
@@ -94,6 +95,7 @@ Alxito drops Manager
 ./rep_add_permission ./user1_session.ses Keeper Carlos
 ./rep_add_permission ./user1_session.ses Reader Dinis
 ./rep_add_permission ./user1_session.ses Professor Eren
+./rep_add_permission ./user1_session.ses Reader Eren
 ./rep_drop_role ./user1_session.ses Manager
 ```
 
@@ -155,6 +157,21 @@ Show Alxito with Reader role
 ./rep_list_permission_roles ./user1_session.ses DOC_NEW
 ./rep_list_role_permissions ./user1_session.ses Keeper
 ./rep_list_subject_roles ./user2_session.ses Alxito
+```
+
+## role suspend
+role Reader is Suspended
+Eren cannot assume Reader
+
+```
+./rep_assume_role ./user1_session.ses Manager
+./rep_drop_role user5_session.ses Reader
+
+./rep_suspend_role user1_session.ses Reader
+./rep_assume_role user5_session.ses Reader
+
+./rep_reactivate_role ./user1_session.ses Reader
+./rep_assume_role user5_session.ses Reader
 ```
 
 # Code

@@ -884,9 +884,10 @@ def assume_role():
             SELECT r.name
             FROM subject_roles sr
             JOIN roles r ON sr.role_id = r.id
-            WHERE sr.subject_id = ? AND sr.status = TRUE;
+            WHERE sr.subject_id = ? AND r.status = TRUE;
         """, (usr,))
         subject_allowed_roles = list(map(lambda x:x[0], cur.fetchall()))
+        print(subject_allowed_roles)
 
         if role.lower() not in map(str.lower, subject_allowed_roles):
             return jsonify({"error": "Subject does not have permission for this role."}), 202
@@ -1375,18 +1376,12 @@ def ping():
     db = get_db()
     cur = db.cursor()
 
-    cur.execute(f"""
-        SELECT
-            p.name
-        FROM roles r
-        JOIN document_acls da ON da.role_id = r.id
-        JOIN permissions p ON p.id = da.permission_id
-        JOIN documents d ON d.id = da.document_id
-        WHERE 
-            d.name = ? AND
-            r.name = ? AND
-            r.organization_id = ?;
-    """, ('README.md', 'Reader', 1))
+    cur.execute("""
+            SELECT r.name, sr.status
+            FROM subject_roles sr
+            JOIN roles r ON sr.role_id = r.id
+            WHERE sr.subject_id = ? AND r.status = TRUE;
+        """, (5,))
     for i in cur.fetchall():
         print(*i)
     return jsonify({"status": "up"}), 200
