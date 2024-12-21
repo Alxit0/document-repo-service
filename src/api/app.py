@@ -196,20 +196,6 @@ def dh_init():
         "server_public_key": base64.b64encode(server_public_key_bytes).decode()
     }), 200
 
-@app.route('/jail-house-lock', methods=['GET'])
-def clean_database():
-    
-    db = get_db()
-    db.close()
-
-    os.remove(DATABASE)
-    g.pop('db')
-
-    with app.app_context():
-        initialize_db()
-
-    return jsonify({"status": "success"}), 200
-
 
 # organization endpoints
 @app.route("/organization/list")
@@ -1373,17 +1359,6 @@ def acl_doc_remove():
 
 @app.route("/ping")
 def ping():
-    db = get_db()
-    cur = db.cursor()
-
-    cur.execute("""
-            SELECT r.name, sr.status
-            FROM subject_roles sr
-            JOIN roles r ON sr.role_id = r.id
-            WHERE sr.subject_id = ? AND r.status = TRUE;
-        """, (5,))
-    for i in cur.fetchall():
-        print(*i)
     return jsonify({"status": "up"}), 200
 
 if __name__ == '__main__':
