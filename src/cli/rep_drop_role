@@ -28,13 +28,19 @@ def rep_drop_role(session_file:str, role:str):
     
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
     
     data = json.loads(res.content)
 
     logger.info("New token: " + data['session_token'])
     with open(session_file, "+w") as file:
         file.write(data['session_token'])
+
+    logger.info(data)
+    if res == 200:
+        return 0
+    else:
+        return -1
 
 
 if __name__ == '__main__':

@@ -25,7 +25,12 @@ def rep_delete_doc(session_file:str, document_name:str):
 
     res = secure_requests.secure_put(f"http://{utils.state['REP_ADDRESS']}/file/delete", headers=headers, json=body)
 
-    logger.info(json.loads(res.content))
+    data = json.loads(res.content)
+    logger.info(data)
+    if res == 200:
+        return 0
+    else:
+        return -1
 
 
 if __name__ == '__main__':

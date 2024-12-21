@@ -26,7 +26,12 @@ def rep_add_role(session_file:str, role:str):
 
     res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/role/add", headers=headers, json=body)
 
-    logger.info(json.loads(res.content))
+    data = json.loads(res.content)
+    logger.info(data)
+    if res == 200:
+        return 0
+    else:
+        return -1
 
 
 if __name__ == '__main__':

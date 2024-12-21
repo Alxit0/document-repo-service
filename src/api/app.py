@@ -7,7 +7,7 @@ import os
 from flask import Flask, jsonify, request, send_file, g
 import json
 
-from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
+from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body, verify_file_handle
 from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
@@ -71,7 +71,15 @@ def verify_session():
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
             
-            #
+            # check subject status
+            usr = extrat_token_info(token)['usr']
+            cur = get_db().cursor()
+            cur.execute("SELECT status FROM subjects WHERE id = ?", (usr,))
+            stat = cur.fetchone()
+            cur.close()
+
+            if not stat:
+                return jsonify({"error": "Subject not active"}), 405
 
             return func(*args, **kwargs)
         
@@ -79,7 +87,7 @@ def verify_session():
     
     return decorator
 
-def verify_permission(required_permissions: List[str], choser=lambda x:0):
+def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_related=False):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -101,15 +109,33 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0):
             cur = db.cursor()
             
             try:
-                placeholders = ', '.join(['?'] * len(session_roles))
-                cur.execute(f"""
-                    SELECT p.name
-                    FROM permissions p 
-                    JOIN role_permissions rp ON rp.permission_id = p.id
-                    JOIN roles r ON r.id = rp.role_id
-                    WHERE r.name = ({placeholders}) AND r.organization_id = ?;
-                """, (*session_roles, org))
-                session_permissions = set(row[0] for row in cur.fetchall())
+                if not doc_related:
+                    placeholders = ', '.join(['?'] * len(session_roles))
+                    cur.execute(f"""
+                        SELECT p.name
+                        FROM permissions p 
+                        JOIN role_permissions rp ON rp.permission_id = p.id
+                        JOIN roles r ON r.id = rp.role_id
+                        WHERE r.name = ({placeholders}) AND r.organization_id = ?;
+                    """, (*session_roles, org))
+                    session_permissions = set(row[0] for row in cur.fetchall())
+                else:
+                    doc_name = request.decrypted_params['document_name']
+                    placeholders = ', '.join(['?'] * len(session_roles))
+                    cur.execute(f"""
+                        SELECT
+                            p.name
+                        FROM roles r
+                        JOIN document_acls da ON da.role_id = r.id
+                        JOIN permissions p ON p.id = da.permission_id
+                        JOIN documents d ON d.id = da.document_id
+                        WHERE 
+                            d.name = ? AND
+                            r.name = ({placeholders}) AND
+                            r.organization_id = ?;
+                    """, (doc_name, *session_roles, org))
+                    session_permissions = set(row[0] for row in cur.fetchall())
+                    
 
                 if target not in session_permissions:
                     return jsonify({"error": "Session does not have necessary permissions"}), 402
@@ -119,7 +145,7 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0):
             
             except Exception as e:
                 db.rollback()
-                return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+                return jsonify({"error": "Internal Server Error (VP)", "message": str(e)}), 500
             
             finally:
                 cur.close()
@@ -169,20 +195,6 @@ def dh_init():
     return jsonify({
         "server_public_key": base64.b64encode(server_public_key_bytes).decode()
     }), 200
-
-@app.route('/jail-house-lock', methods=['GET'])
-def clean_database():
-    
-    db = get_db()
-    db.close()
-
-    os.remove(DATABASE)
-    g.pop('db')
-
-    with app.app_context():
-        initialize_db()
-
-    return jsonify({"status": "success"}), 200
 
 
 # organization endpoints
@@ -392,16 +404,23 @@ def upload_file():
             (doc_id, encrypted_key, alg, iv, nonce)
         )
 
+        # Save the uploaded file to the specified path
+        save_path = os.path.join(REPO_PATH, file_handle)
+        document_file.save(save_path)
+
+        with open(save_path, 'rb') as file:
+            content = file.read()
+        
+        # After saving the file, verify the file handle
+        if not verify_file_handle(content, alg, encrypted_key, iv, nonce, file_handle):
+            raise Exception("File handle does not match the file content")
+
         con.commit()
     except Exception as e:
         con.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
     finally:
         cur.close()
-
-    # Save the uploaded file to the specified path
-    save_path = os.path.join(REPO_PATH, file_handle)
-    document_file.save(save_path)
 
     return jsonify({
         "status": "Document uploaded successfully",
@@ -491,7 +510,6 @@ def list_docs():
 
 @app.route("/file/download/<file_handle>")
 @secure_endpoint()
-@verify_permission(["DOC_READ"])
 def get_file(file_handle: str):
 
     file_path = os.path.join(REPO_PATH, file_handle)
@@ -505,7 +523,7 @@ def get_file(file_handle: str):
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
-@verify_permission(["DOC_READ"])
+@verify_permission(["DOC_READ"], doc_related=True)
 def get_doc_metadata():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -563,7 +581,7 @@ def get_doc_metadata():
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
-@verify_permission(["DOC_DELETE"])
+@verify_permission(["DOC_DELETE"], doc_related=True)
 def delete_file():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -578,15 +596,17 @@ def delete_file():
     try:
         # ensure the doc exists and belongs to the user's org
         cur.execute("""
-            SELECT id, handle FROM documents
-            WHERE name = ? AND organization_id = ? AND deleted_by IS NULL
+            SELECT d.id, d.handle, dm.encryption_key, dm.alg, dm.iv, dm.nonce
+            FROM documents d
+            JOIN document_metadata dm ON dm.document_id = d.id
+            WHERE d.name = ? AND d.organization_id = ? AND d.deleted_by IS NULL
         """, (doc_name, org_id))
         document = cur.fetchone()
 
         if not document:
             return jsonify({"error": "Document not found or already deleted"}), 404
 
-        doc_id, handle = document
+        doc_id = document[0]
 
         # update the deleted_by column to indicate soft deletion
         cur.execute("""
@@ -598,7 +618,14 @@ def delete_file():
         # Commit the transaction
         db.commit()
 
-        return jsonify({"status": "success", "handle": handle}), 200
+        return jsonify({
+            "status": "success", 
+            "handle": document[1],
+            "encryption_key": document[2],
+            "algorithm": document[3],
+            "iv": document[4],
+            "nonce": document[5]
+        }), 200
 
     except Exception as e:
         db.rollback()
@@ -726,6 +753,17 @@ def suspend_subject():
     cur = db.cursor()
 
     try:
+        cur.execute("""
+            SELECT r.name 
+            FROM roles r 
+            JOIN subject_roles sr ON r.id = sr.role_id
+            JOIN subjects s ON sr.subject_id = s.id
+            WHERE s.username = ?;
+        """, (username,))
+        roles_of_target = [i[0] for i in cur.fetchall()]
+
+        if 'Manager' in roles_of_target:
+            raise Exception("User is a Manager (cannot be suspended)")
 
         cur.execute("""
             UPDATE subjects
@@ -832,9 +870,10 @@ def assume_role():
             SELECT r.name
             FROM subject_roles sr
             JOIN roles r ON sr.role_id = r.id
-            WHERE sr.subject_id = ? AND sr.status = TRUE;
+            WHERE sr.subject_id = ? AND r.status = TRUE;
         """, (usr,))
         subject_allowed_roles = list(map(lambda x:x[0], cur.fetchall()))
+        print(subject_allowed_roles)
 
         if role.lower() not in map(str.lower, subject_allowed_roles):
             return jsonify({"error": "Subject does not have permission for this role."}), 202
@@ -901,6 +940,9 @@ def add_permission():
             resp = jsonify({"status": "success", "message": f"User '{target}' can now be '{role}'."}), 200
 
         else:
+            if target in ['DOC_READ', 'DOC_DELETE']:
+                raise Exception("This permission is related to Documents")
+
             cur.execute("""
                 INSERT INTO role_permissions (role_id, permission_id)
                 VALUES (
@@ -908,6 +950,11 @@ def add_permission():
                     (SELECT id FROM permissions WHERE name = ?)
                 );
             """, (role, org_id, target))
+
+            # in case of adding a Manager
+            if role == 'Manager':
+                cur.execute("UPDATE organizations SET active_managers = active_managers + 1 WHERE id = ?;", (org_id,))
+
             resp = jsonify({"status": "success", "message": f"Role '{role}' has now the '{target}' permission."}), 200
                 
         db.commit()
@@ -957,6 +1004,11 @@ def remove_permission():
                     role_id = (SELECT id FROM roles WHERE name = ? AND organization_id = ?) AND 
                     permission_id = (SELECT id FROM permissions WHERE name = ?);
             """, (role, org_id, target))
+
+            # in case of removing a Manager
+            if role == 'Manager':
+                cur.execute("UPDATE organizations SET active_managers = active_managers - 1 WHERE id = ?;", (org_id,))
+
             resp = jsonify({"status": "success", "message": f"Role '{target}' no longer has the '{target}' permission."}), 200
                 
         db.commit()
@@ -1207,6 +1259,9 @@ def role_status():
     data = request.decrypted_params
     role: str = data['role']
     status: bool = data['status']
+
+    if role == 'Manager':
+        return jsonify({"error": "Internal Server Error", "message": "The status of 'Manager' is always active"})
 
     db = get_db()
     cur = db.cursor()

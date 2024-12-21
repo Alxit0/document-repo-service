@@ -64,7 +64,6 @@ def initiate_dh_key_exchange():
     digest = hashes.Hash(hashes.SHA256())
     digest.update(shared_secret)
     valid_key = digest.finalize()  # 256-bit (32 bytes) key
-    print(valid_key.hex())
 
     return valid_key
 

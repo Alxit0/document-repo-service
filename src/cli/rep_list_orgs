@@ -14,14 +14,16 @@ def rep_list_orgs():
     # check status of api call    
     logger.debug(res)
     if res.status_code != 200:
-        print(json.loads(res.content))
-        return
+        logger.info(json.loads(res.content))
+        return -1
 
     # display info
     print(f"{'Org name':<20} | {'Creator'}")
     print("-"*40)
     for org in json.loads(res.content)['organizations']:
         print(f"{org['organization_name']:<20} | {org['creator_username']}")
+    
+    return 0
 
 if __name__ == '__main__':
     rep_list_orgs()

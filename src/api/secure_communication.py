@@ -3,14 +3,35 @@ import json
 from flask import Response, request, jsonify
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import hashes, hmac, serialization
+from cryptography.hazmat.primitives import hashes, hmac, serialization, padding
 from cryptography.hazmat.primitives.serialization import load_pem_parameters
+from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
+import hashlib
 import base64
 import os
 
 # Shared secret key for encryption and HMAC
 PARAMETERS_FILE = "./dh_parameters.pem"
+
+ALGOS = {
+    'AES': lambda x,y: algorithms.AES(x),
+    'ChaCha20': lambda x,y: algorithms.ChaCha20(x, y),
+    'AES128': lambda x,y: algorithms.AES128(x),
+    'AES256': lambda x,y: algorithms.AES256(x),
+    'Camellia': lambda x,y: algorithms.Camellia(x),
+    '': lambda x,y: None,
+}
+
+MODES = {
+    "CBC": lambda x: modes.CBC(x),
+    "OFB": lambda x: modes.OFB(x),
+    "CFB": lambda x: modes.CFB(x),
+    "ECB": lambda x: modes.ECB(),
+    '': lambda x: None,
+}
+
+
 client_shared_keys = {} # Store client-specific shared keys (keyed by client_id)
 
 def load_or_generate_parameters():
@@ -133,3 +154,34 @@ def secure_endpoint():
         return wrapper
     
     return decorator
+
+
+def verify_file_handle(document_file, algorithm, key, iv, nonce, file_handle):
+    
+    algo, mode = algorithm.split('-')
+
+    # Step 1: Decrypt the file using the encryption key, IV, and nonce
+    # Create a cipher object with the correct encryption algorithm and parameters
+    cipher = Cipher(
+        ALGOS[algo](base64.b64decode(key), base64.b64decode(nonce)), 
+        MODES[mode](base64.b64decode(iv))
+    )
+    decryptor = cipher.decryptor()
+
+    # Step 2: Decrypt the file content
+    decrypted_data = decryptor.update(document_file) + decryptor.finalize()
+
+    # unpadd
+    unpadder =  padding.PKCS7(128).unpadder()
+    data = unpadder.update(decrypted_data)
+    data += unpadder.finalize()
+    
+    # Step 3: Hash the decrypted data
+    hashed_content = hashlib.sha256(data).hexdigest()
+
+    print(hashed_content, file_handle)
+    # Step 4: Compare the recomputed hash with the file_handle
+    if hashed_content == file_handle:
+        return True
+    else:
+        return False

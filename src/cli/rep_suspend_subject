@@ -28,8 +28,10 @@ def rep_suspend_subject(session_file: str, username: str):
 
     if response.status_code == 200:
         print(f"Subject '{username}' suspended successfully.")
+        return 0
     else:
         print(f"Failed to reactivate subject '{username}':", response.text)
+        return -1
 
 if __name__ == '__main__':
     rep_suspend_subject()

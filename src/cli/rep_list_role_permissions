@@ -32,7 +32,7 @@ def rep_list_role_permissions(session_file: str, role: str):
 
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
 
     # output
     data = json.loads(res.content)
@@ -41,6 +41,8 @@ def rep_list_role_permissions(session_file: str, role: str):
     print(f"'{role}' permissions:")
     for perm in roles:
         print("\t"+perm)
+    
+    return 0
 
 
 

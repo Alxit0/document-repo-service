@@ -27,8 +27,12 @@ def rep_remove_permission(session_file:str, role:str, target:str):
     }
 
     res = secure_requests.secure_delete(f"http://{utils.state['REP_ADDRESS']}/role/remove_permission", headers=headers, json=body)
+    if res.status_code != 200:
+        logger.info(res.content.decode())
+        return -1
 
     logger.info(json.loads(res.content))
+    return 0
 
 
 if __name__ == '__main__':

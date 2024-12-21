@@ -36,7 +36,12 @@ def rep_add_subject(session_file:str, username:str, name:str, email:str, cred_fi
 
     res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/subject/add", headers=headers, json=body)
 
-    logger.info(json.loads(res.content))
+    data = json.loads(res.content)
+    logger.info(data)
+    if res == 200:
+        return 0
+    else:
+        return -1
 
 
 if __name__ == '__main__':
