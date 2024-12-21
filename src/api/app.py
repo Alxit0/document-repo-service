@@ -506,7 +506,6 @@ def list_docs():
 
 @app.route("/file/download/<file_handle>")
 @secure_endpoint()
-@verify_permission(["DOC_READ"])
 def get_file(file_handle: str):
 
     file_path = os.path.join(REPO_PATH, file_handle)
