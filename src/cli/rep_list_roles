@@ -24,7 +24,7 @@ def rep_list_roles(session_file:str):
 
     if res.status_code != 200:
         logger.info(res.content.decode())
-        return
+        return -1
     
     # output
     data = json.loads(res.content)
@@ -35,6 +35,8 @@ def rep_list_roles(session_file:str):
     for name, stat in roles:
         status = 'Active' if stat else 'Suspended'
         print(f"{status:<10} | {name:<20}")
+
+    return 0
 
 
 if __name__ == '__main__':

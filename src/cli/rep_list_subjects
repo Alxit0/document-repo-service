@@ -35,12 +35,15 @@ def rep_list_subjects(session_file: str, username: str = None):
                 print(f"No subject found with username '{username}'.")
             else:
                 print("No subjects found for this organization.")
+            return -1
         else:
             for subject in subjects:
                 status = "Active" if subject['status'] else "Suspended"
                 print(f"Username: {subject['username']}, Name: {subject['name']}, Status: {status}")
+        return 0
     else:
         print(f"Failed to retrieve subjects: {response.status_code}, {response.text}")
+        return -1
 
 
 

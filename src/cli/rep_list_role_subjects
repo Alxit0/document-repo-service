@@ -30,12 +30,14 @@ def rep_list_role_subjects(session_file: str, role: str):
 
     if response.status_code != 200:
         logger.info(response.content.decode())
-        return
+        return -1
 
     subjects = response.json().get("subjects", [])
     for subject in subjects:
         status = "Active" if subject['status'] else "Suspended"
         print(f"Username: {subject['username']}, Name: {subject['full_name']}, Status: {status}")
+    
+    return 0
 
 
 

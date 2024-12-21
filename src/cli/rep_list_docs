@@ -59,9 +59,10 @@ def rep_list_docs(session_file, username, date):
 
     if response.status_code != 200:
         logger.info(f"Error: {response_data.get('error')}, Message: {response_data.get('message')}")
-        return
+        return -1
 
     pprint(response_data['documents'])
+    return 0
 
 if __name__ == '__main__':
     rep_list_docs()

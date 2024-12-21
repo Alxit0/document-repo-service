@@ -69,10 +69,12 @@ def rep_get_doc_file(session_file: str, document_name: str, file: str):
     # output to the command line
     if not file:
         print(fp_decrypted.decode())
-        return
+        return 0
     
     with open(file, "wb+") as fp:
         fp.write(fp_decrypted)
+
+    return 0
     
 
 if __name__ == '__main__':

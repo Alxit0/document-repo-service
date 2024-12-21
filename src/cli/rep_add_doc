@@ -63,9 +63,11 @@ def rep_add_doc(session_file: str, document_name: str, file: str):
 
     # Check the response
     if response.status_code == 200:
-        print("Document uploaded successfully.")
+        logger.info("Document uploaded successfully.")
+        return 0
     else:
-        print("Failed to upload document:", response.text)
+        logger.info("Failed to upload document:", response.text)
+        return -1
 
 if __name__ == '__main__':
     rep_add_doc()
