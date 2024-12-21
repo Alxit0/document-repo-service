@@ -2,6 +2,7 @@
 
 import json
 import click
+from cryptography.hazmat.primitives import serialization
 from requests import Response
 
 import secure_requests
@@ -30,9 +31,13 @@ def rep_create_org(organization: str, username: str, name: str, email: str, pub_
     
     # Load and decrypt the private key
     with open(pub_key_file, 'r') as file:
-        keys = json.load(file)
-    public_key = keys['REP_PUB_KEY']
-    
+        try:
+            keys = json.load(file)
+            public_key = keys['REP_PUB_KEY']
+        except:
+            file.seek(0)
+            public_key = file.read()
+
     body = {
         "organization": organization,
         "username": username,
