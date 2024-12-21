@@ -7,7 +7,7 @@ import os
 from flask import Flask, jsonify, request, send_file, g
 import json
 
-from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body
+from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body, verify_file_handle
 from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
 from costum_auth import verify_token, write_token, extrat_token_info, verify_signature
 
@@ -400,16 +400,23 @@ def upload_file():
             (doc_id, encrypted_key, alg, iv, nonce)
         )
 
+        # Save the uploaded file to the specified path
+        save_path = os.path.join(REPO_PATH, file_handle)
+        document_file.save(save_path)
+
+        with open(save_path, 'rb') as file:
+            content = file.read()
+        
+        # After saving the file, verify the file handle
+        if not verify_file_handle(content, alg, encrypted_key, iv, nonce, file_handle):
+            raise Exception("File handle does not match the file content")
+
         con.commit()
     except Exception as e:
         con.rollback()
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
     finally:
         cur.close()
-
-    # Save the uploaded file to the specified path
-    save_path = os.path.join(REPO_PATH, file_handle)
-    document_file.save(save_path)
 
     return jsonify({
         "status": "Document uploaded successfully",
