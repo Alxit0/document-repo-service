@@ -71,7 +71,15 @@ def verify_session():
             if not verify_token(token):
                 return jsonify({"error": "Invalid session token"}), 403
             
-            #
+            # check subject status
+            usr = extrat_token_info(token)['usr']
+            cur = get_db().cursor()
+            cur.execute("SELECT status FROM subjects WHERE id = ?", (usr,))
+            stat = cur.fetchone()
+            cur.close()
+
+            if not stat:
+                return jsonify({"error": "Subject not active"}), 405
 
             return func(*args, **kwargs)
         
