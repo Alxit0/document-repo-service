@@ -135,7 +135,7 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
                             r.organization_id = ?;
                     """, (doc_name, *session_roles, org))
                     session_permissions = set(row[0] for row in cur.fetchall())
-                print((doc_name, *session_roles, org))
+                    
 
                 if target not in session_permissions:
                     return jsonify({"error": "Session does not have necessary permissions"}), 402
@@ -145,7 +145,7 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
             
             except Exception as e:
                 db.rollback()
-                return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+                return jsonify({"error": "Internal Server Error (VP)", "message": str(e)}), 500
             
             finally:
                 cur.close()
