@@ -87,7 +87,7 @@ def verify_session():
     
     return decorator
 
-def verify_permission(required_permissions: List[str], choser=lambda x:0):
+def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_related=False):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -109,15 +109,33 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0):
             cur = db.cursor()
             
             try:
-                placeholders = ', '.join(['?'] * len(session_roles))
-                cur.execute(f"""
-                    SELECT p.name
-                    FROM permissions p 
-                    JOIN role_permissions rp ON rp.permission_id = p.id
-                    JOIN roles r ON r.id = rp.role_id
-                    WHERE r.name = ({placeholders}) AND r.organization_id = ?;
-                """, (*session_roles, org))
-                session_permissions = set(row[0] for row in cur.fetchall())
+                if not doc_related:
+                    placeholders = ', '.join(['?'] * len(session_roles))
+                    cur.execute(f"""
+                        SELECT p.name
+                        FROM permissions p 
+                        JOIN role_permissions rp ON rp.permission_id = p.id
+                        JOIN roles r ON r.id = rp.role_id
+                        WHERE r.name = ({placeholders}) AND r.organization_id = ?;
+                    """, (*session_roles, org))
+                    session_permissions = set(row[0] for row in cur.fetchall())
+                else:
+                    doc_name = request.decrypted_params['document_name']
+                    placeholders = ', '.join(['?'] * len(session_roles))
+                    cur.execute(f"""
+                        SELECT
+                            p.name
+                        FROM roles r
+                        JOIN document_acls da ON da.role_id = r.id
+                        JOIN permissions p ON p.id = da.permission_id
+                        JOIN documents d ON d.id = da.document_id
+                        WHERE 
+                            d.name = ? AND
+                            r.name = ({placeholders}) AND
+                            r.organization_id = ?;
+                    """, (doc_name, *session_roles, org))
+                    session_permissions = set(row[0] for row in cur.fetchall())
+                print((doc_name, *session_roles, org))
 
                 if target not in session_permissions:
                     return jsonify({"error": "Session does not have necessary permissions"}), 402
@@ -519,7 +537,7 @@ def get_file(file_handle: str):
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
-@verify_permission(["DOC_READ"])
+@verify_permission(["DOC_READ"], doc_related=True)
 def get_doc_metadata():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -577,7 +595,7 @@ def get_doc_metadata():
 @secure_endpoint()
 @verify_session()
 @verify_args(["document_name"])
-@verify_permission(["DOC_DELETE"])
+@verify_permission(["DOC_DELETE"], doc_related=True)
 def delete_file():
 
     doc_name = request.decrypted_params.get("document_name")
@@ -935,6 +953,9 @@ def add_permission():
             resp = jsonify({"status": "success", "message": f"User '{target}' can now be '{role}'."}), 200
 
         else:
+            if target in ['DOC_READ', 'DOC_DELETE']:
+                raise Exception("This permission is related to Documents")
+
             cur.execute("""
                 INSERT INTO role_permissions (role_id, permission_id)
                 VALUES (
@@ -1351,6 +1372,23 @@ def acl_doc_remove():
 
 @app.route("/ping")
 def ping():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute(f"""
+        SELECT
+            p.name
+        FROM roles r
+        JOIN document_acls da ON da.role_id = r.id
+        JOIN permissions p ON p.id = da.permission_id
+        JOIN documents d ON d.id = da.document_id
+        WHERE 
+            d.name = ? AND
+            r.name = ? AND
+            r.organization_id = ?;
+    """, ('README.md', 'Reader', 1))
+    for i in cur.fetchall():
+        print(*i)
     return jsonify({"status": "up"}), 200
 
 if __name__ == '__main__':
