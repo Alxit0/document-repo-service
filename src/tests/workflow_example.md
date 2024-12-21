@@ -23,6 +23,8 @@ Listar orgs
 
 ```
 ./rep_create_org Babel Alxito "Alexandre R." alex@sal.com user1.creds
+./rep_create_session Babel Alxito ola121 ./user1.creds ./user1_session.ses
+./rep_assume_role ./user1_session.ses Manager
 ./rep_list_orgs
 ```
 
@@ -40,7 +42,6 @@ Everyone logsin
 ./rep_add_subject ./user1_session.ses Dinis "Dinis D." dinis@sal.com ./user4.creds
 ./rep_add_subject ./user1_session.ses Eren "Eren Y." erem@sal.com ./user5.creds
 
-./rep_create_session Babel Alxito ola121 ./user1.creds ./user1_session.ses
 ./rep_create_session Babel Benny ola122 ./user2.creds ./user2_session.ses
 ./rep_create_session Babel Carlos ola123 ./user3.creds ./user3_session.ses
 ./rep_create_session Babel Dinis ola124 ./user4.creds ./user4_session.ses
