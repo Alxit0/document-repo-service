@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import json
+import click
+import secure_requests
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('role',required=True, type=str)
+def rep_add_role(session_file:str, role:str):
+    
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+
+    headers = {
+        "session": session
+    }
+
+    body = {
+        "role": role
+    }
+
+    res = secure_requests.secure_post(f"http://{utils.state['REP_ADDRESS']}/role/add", headers=headers, json=body)
+
+    data = json.loads(res.content)
+    logger.info(data)
+    if res == 200:
+        return 0
+    else:
+        return -1
+
+
+if __name__ == '__main__':
+    rep_add_role()
