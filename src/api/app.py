@@ -1,11 +1,12 @@
 import base64
+from pprint import pprint
 from typing import List
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.fernet import Fernet
 from datetime import datetime
 from functools import wraps
 import os
 from flask import Flask, jsonify, request, send_file, g
-import json
 
 from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body, verify_file_handle
 from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
@@ -16,6 +17,8 @@ app = Flask(__name__)
 challenges = {}
 
 # database setup
+SERVER_KEY = os.getenv('ENCRYPTION_KEY').encode()
+cipher_suite = Fernet(SERVER_KEY)
 app.teardown_appcontext(close_db)
 with app.app_context():
     initialize_db()
@@ -154,6 +157,16 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
     
     return decorator
 
+@app.route('/jail-house-lock', methods=['GET'])
+def clean_database():
+    
+    db = get_db()
+    db.close()
+    os.remove(DATABASE)
+    g.pop('db')
+    with app.app_context():
+        initialize_db()
+    return jsonify({"status": "success"}), 200
 
 # secure comunication setup
 @app.route('/get-parameters', methods=['GET'])
@@ -401,7 +414,13 @@ def upload_file():
             INSERT INTO document_metadata (document_id, encryption_key, alg, iv, nonce)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (doc_id, encrypted_key, alg, iv, nonce)
+            (
+                doc_id, 
+                cipher_suite.encrypt(encrypted_key.encode()), 
+                cipher_suite.encrypt(alg.encode()), 
+                cipher_suite.encrypt(iv.encode()), 
+                cipher_suite.encrypt(nonce.encode())
+            )
         )
 
         # Save the uploaded file to the specified path
@@ -564,10 +583,10 @@ def get_doc_metadata():
             "document_id": result[0],
             "file_handle": result[1],
             "document_name": result[2],
-            "encryption_key": result[3],
-            "algorithm": result[4],
-            "iv": result[5],
-            "nonce": result[6]
+            "encryption_key": cipher_suite.decrypt(result[3]).decode(),
+            "algorithm": cipher_suite.decrypt(result[4]).decode(),
+            "iv": cipher_suite.decrypt(result[5]).decode(),
+            "nonce": cipher_suite.decrypt(result[6]).decode()
         }
 
         return jsonify({"status": "success", "metadata": doc_metadata}),200
@@ -596,9 +615,8 @@ def delete_file():
     try:
         # ensure the doc exists and belongs to the user's org
         cur.execute("""
-            SELECT d.id, d.handle, dm.encryption_key, dm.alg, dm.iv, dm.nonce
+            SELECT d.id, d.handle
             FROM documents d
-            JOIN document_metadata dm ON dm.document_id = d.id
             WHERE d.name = ? AND d.organization_id = ? AND d.deleted_by IS NULL
         """, (doc_name, org_id))
         document = cur.fetchone()

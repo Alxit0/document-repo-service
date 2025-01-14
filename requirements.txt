@@ -3,3 +3,4 @@ flask
 click
 cryptography
 PyJWT
+python-dotenv
