@@ -43,9 +43,27 @@ def rep_create_session(organization: str, username: str, password: str, cred_fil
         logger.info(json.loads(res.content))
         return
 
-    nonce = json.loads(res.content)['nounce']
+    response_data = json.loads(res.content)
+    nonce = response_data['nounce']
+    server_signature = response_data['signature']
+    
+    # verify server signature
+    server_public_key = serialization.load_pem_public_key(utils.state['REP_PUB_KEY'].encode())
+    try:
+        server_public_key.verify(
+            base64.b64decode(server_signature),
+            nonce.encode('utf-8'),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+    except Exception as e:
+        logger.info("Failed to verify server signature.")
+        return -1
 
-    # Load and decrypt the private key
+    # load and decrypt the private key
     with open(cred_file, 'r') as file:
         keys = json.load(file)
     

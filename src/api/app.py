@@ -3,7 +3,7 @@ import secrets
 import string
 from typing import List
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from datetime import datetime
@@ -365,15 +365,29 @@ def challenge():
 
     data = request.decrypted_params
 
-    # check if is already generated
-    if data['username'] in challenges:
-        return jsonify({"nounce": base64.b64encode(challenges[data['username']]).decode('utf-8')}), 200
-
     # gen nonce
     nonce = data['username'].encode() + os.urandom(16)
     challenges[data['username']] = nonce
-    
-    return jsonify({"nounce": base64.b64encode(nonce).decode('utf-8')}), 200
+
+    # sign the nonce with server private key
+    message = base64.b64encode(nonce).decode('utf-8')
+    server_private_key = serialization.load_pem_private_key(
+        os.getenv('PRIVATE_KEY').encode(),
+        SERVER_KEY
+    )
+    signature = server_private_key.sign(
+        message.encode('utf-8'),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+    return jsonify({
+        "nounce": message,
+        "signature": base64.b64encode(signature).decode('utf-8')
+    }), 200
 
 @app.route("/session/create", methods=['POST'])
 @secure_endpoint()
