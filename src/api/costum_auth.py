@@ -1,14 +1,11 @@
 from datetime import datetime, timedelta
 import os
-from dotenv import load_dotenv
 from jwt import encode, decode, exceptions
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidKey
 
-# TODO: change for env variable
-load_dotenv()
 SECRET = os.getenv('JWT_SECRET')
 
 # cryptografic related functions

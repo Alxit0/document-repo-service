@@ -1,12 +1,72 @@
 import base64
-from pprint import pprint
+import secrets
+import string
 from typing import List
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 from datetime import datetime
 from functools import wraps
 import os
+import dotenv
 from flask import Flask, jsonify, request, send_file, g
+
+# laod env variables and generate them if needed
+def gen_env_vars():
+    def generate_random_string(length=256):
+        characters = string.ascii_letters + string.digits + string.punctuation
+        random_string = ''.join(secrets.choice(characters) for _ in range(length))
+        return random_string
+
+    # ensure file exists
+    with open('./.env', 'a+'):pass
+
+    # current variables
+    current = dotenv.dotenv_values('./.env')
+
+    # gen variable
+    if 'ENCRYPTION_KEY' not in current:
+        dotenv.set_key('./.env', 'ENCRYPTION_KEY', Fernet.generate_key().decode())
+        print('[GEN] Generated Encryotion key ...')
+    
+    if 'JWT_SECRET' not in current:
+        dotenv.set_key('./.env', 'JWT_SECRET', generate_random_string())
+        print('[GEN] Generated JWT Secret ...')
+
+    
+    if 'PRIVATE_KEY' not in current or 'PUBLIC_KEY' not in current:
+        # create keys
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()   
+        )
+        public_key = private_key.public_key()
+        
+        # gen keys
+        public_key_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        
+        password = dotenv.get_key('./.env', 'ENCRYPTION_KEY')
+        encryption_algorithm = serialization.BestAvailableEncryption(password.encode())
+        private_key_bytes = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=encryption_algorithm
+        )
+        dotenv.set_key('./.env', 'PRIVATE_KEY', private_key_bytes.decode())
+        dotenv.set_key('./.env', 'PUBLIC_KEY', public_key_bytes.decode())
+        
+        # save public key
+        with open('./server_public_key.pem', "wb+") as pub_file:
+            pub_file.write(public_key_bytes)
+        
+        print('[GEN] Generated Private / Public keys ...')
+gen_env_vars()
+dotenv.load_dotenv()
 
 from secure_communication import secure_endpoint, parameters, client_shared_keys, get_right_body, verify_file_handle
 from database import initialize_db, close_db, get_db, REPO_PATH, DATABASE
@@ -16,9 +76,13 @@ app = Flask(__name__)
 
 challenges = {}
 
-# database setup
+# load enviroment
 SERVER_KEY = os.getenv('ENCRYPTION_KEY').encode()
+PRIVATE_KEY = os.getenv('PRIVATE_KEY').encode()
+PUBLIC_KEY = os.getenv('PUBLIC_KEY').encode()
 cipher_suite = Fernet(SERVER_KEY)
+
+# database setup
 app.teardown_appcontext(close_db)
 with app.app_context():
     initialize_db()
@@ -160,6 +224,9 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
 @app.route('/jail-house-lock', methods=['GET'])
 def clean_database():
     
+    for i in os.listdir('./docs_repo/'):
+        os.remove(os.path.join('./docs_repo/', i))
+
     db = get_db()
     db.close()
     os.remove(DATABASE)

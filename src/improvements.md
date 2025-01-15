@@ -15,4 +15,5 @@ This improvement just makes the data to be stored encrypted. The processing and 
 
 **In Case of Rebooting**: In case of server reboting we are going to lose all the numberings. However, in this case of server rebooting, the shared keys will also be lost, wich will require the renegotiating of the shared key, wich will render the request useless for replaying.  
 
-## Validar server
+## Validate server
+
