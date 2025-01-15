@@ -31,4 +31,8 @@ The server sends the chalenge signed with tis private key for the user to valida
 
 - **Server Verifies the Client's Signature**: The server checks the client's signature using the client's stored public key, authenticating the client.
 
+## Db refactor
 
+The refactor involved the deletion and modification of certain tables. 
+
+These tables were identified as unnecessary because their concepts and purposes were duplicated elsewhere in the database.
