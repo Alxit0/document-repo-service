@@ -112,15 +112,22 @@ def prepare_data(headers, data, mode: Literal["params", "json", "data"]):
     query_string = json_lib.dumps(data)
     encrypted_params = encrypt_message(query_string, SHARED_SECRET_KEY, iv)
 
+    # get sequence number
+    if 'sequence_requests_number' not in utils.state:
+        utils.state['sequence_requests_number'] = 0
+    utils.state['sequence_requests_number'] += 1
+    seq_num: int = utils.state['sequence_requests_number']
+
     # generate HMAC for the encrypted parameters
-    hmac_value = create_hmac(encrypted_params, SHARED_SECRET_KEY)
+    hmac_value = create_hmac(encrypted_params + seq_num.to_bytes(8, "big"), SHARED_SECRET_KEY)
 
     # add the IV and HMAC to headers
     new_headers = copy.deepcopy(headers) or {}
     new_headers.update({
         "Client-Id": utils.state['client_id'],
         "X-Encrypted-IV": base64.b64encode(iv).decode(),
-        "X-HMAC": base64.b64encode(hmac_value).decode()
+        "X-HMAC": base64.b64encode(hmac_value).decode(),
+        "X-Sequence-Number": str(utils.state['sequence_requests_number'])
     })
 
     if "session" in new_headers:

@@ -32,7 +32,8 @@ MODES = {
 }
 
 
-client_shared_keys = {} # Store client-specific shared keys (keyed by client_id)
+client_shared_keys = {}  # store client-specific shared keys (keyed by client_id)
+client_sequence_numbers = {}  # store client-specific sequence number
 
 def load_or_generate_parameters():
     if os.path.exists(PARAMETERS_FILE):
@@ -106,6 +107,7 @@ def secure_endpoint():
                 received_hmac = base64.b64decode(request.headers.get("X-HMAC", ""))
                 encrypted_session_token = request.headers.get("Session", "")
                 client_id = request.headers.get("Client-Id", "")
+                sequence_number = int(request.headers.get("X-Sequence-Number", 0))
 
                 if client_id not in client_shared_keys:
                     return jsonify({"error": "Need to regnociate secret_key"}), 101
@@ -114,10 +116,20 @@ def secure_endpoint():
 
                 # verify the HMAC
                 try:
-                    verify_hmac(payload, shared_secret_key, received_hmac)
+                    verify_hmac(payload + sequence_number.to_bytes(8, "big"), shared_secret_key, received_hmac)
                 except InvalidSignature as e:
                     print("Invalid signature")
                     return jsonify({"error": "Need to regnociate secret_key"}), 101
+
+                # verify numbering
+                if client_id not in client_sequence_numbers:
+                    client_sequence_numbers[client_id] = 0
+
+                if sequence_number <= client_sequence_numbers[client_id]:
+                    return jsonify({"error": "Invalid sequence number"}), 403
+                
+                client_sequence_numbers[client_id] = sequence_number
+
 
                 # decrypt the payload and nessessary headers
                 decrypted_params = decrypt_message(payload, shared_secret_key, iv).decode()
