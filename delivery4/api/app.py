@@ -560,9 +560,9 @@ def list_docs():
     if date:
         # ensure date is a valid format
         try:
-            filter_date = datetime.strptime(date, "%Y-%m-%d")
+            filter_date = datetime.strptime(date, "%d-%m-%Y")
         except ValueError:
-            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+            return jsonify({"error": "Invalid date format. Use DD-MM-YYYY."}), 400
 
         # filter based on date_filter_type
         if date_filter_type == "nt":  # newer than

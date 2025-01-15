@@ -34,9 +34,9 @@ def rep_list_docs(session_file, username, date):
         
         try:
             # Ensure date is in the correct format
-            datetime.strptime(filter_date, "%Y-%m-%d")
+            datetime.strptime(filter_date, "%d-%m-%Y")
         except ValueError:
-            logger.info("Invalid date format. Use YYYY-MM-DD.")
+            logger.info("Invalid date format. Use DD-MM-YYYY.")
             return
 
     # Prepare the request headers and parameters
