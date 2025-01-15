@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+
+import click
+import secure_requests
+
+import utils
+from utils import default_command, logger
+
+@default_command
+@click.argument('session_file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.argument('role', required=True, type=str)
+def rep_list_role_subjects(session_file: str, role: str):
+
+    with open(session_file, 'r') as f:
+        session = f.read().strip()
+
+    headers = {
+        "session": session
+    }
+
+    body = {
+        'role': role
+    }
+    
+    response = secure_requests.secure_get(
+        f"http://{utils.state['REP_ADDRESS']}/role/list_subjects",
+        headers=headers,
+        params=body
+    )
+
+    if response.status_code != 200:
+        logger.info(response.content.decode())
+        return -1
+
+    subjects = response.json().get("subjects", [])
+    for subject in subjects:
+        status = "Active" if subject['status'] else "Suspended"
+        print(f"Username: {subject['username']}, Name: {subject['full_name']}, Status: {status}")
+    
+    return 0
+
+
+
+if __name__ == '__main__':
+    rep_list_role_subjects()
