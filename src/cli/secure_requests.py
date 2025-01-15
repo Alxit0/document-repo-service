@@ -1,5 +1,6 @@
 import copy
 import json as json_lib
+from pprint import pprint
 from typing import Literal
 import uuid
 import requests
@@ -143,9 +144,13 @@ def prepare_response(response: requests.Response):
         return response
 
     # Extract encrypted response
-    encrypted_response = base64.b64decode(response.json()["ciphertext"])
-    response_iv = base64.b64decode(response.json()["iv"])
-    response_hmac = base64.b64decode(response.json()["hmac"])
+    try:
+        encrypted_response = base64.b64decode(response.json()["ciphertext"])
+        response_iv = base64.b64decode(response.json()["iv"])
+        response_hmac = base64.b64decode(response.json()["hmac"])
+    except KeyError as e:
+        pprint(response.json())
+        raise e
 
     # Verify the HMAC
     verify_hmac(encrypted_response, SHARED_SECRET_KEY, response_hmac)

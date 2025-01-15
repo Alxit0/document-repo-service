@@ -98,9 +98,10 @@ def default_command(func):
         state = parse_args(state, key, repo, verbose)
         
         # Call the original function
-        resp = func(*args, **kwargs)
-
-        save(state)
+        try:
+            resp = func(*args, **kwargs)
+        finally:
+            save(state)
         
         sys.exit(resp if resp is not None else -1)
         return resp
