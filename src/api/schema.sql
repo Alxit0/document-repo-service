@@ -70,19 +70,6 @@ CREATE TABLE roles (
     UNIQUE (organization_id, name)    -- Unique role name within an organization
 );
 
--- default permissions
--- TABLE: Role Permissions
-CREATE TABLE role_permissions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    
-    role_id INTEGER NOT NULL,
-    permission_id INTEGER NOT NULL,
-    
-    FOREIGN KEY (role_id) REFERENCES roles(id),
-    FOREIGN KEY (permission_id) REFERENCES permissions(id),
-    UNIQUE (role_id, permission_id)   -- Prevent duplicate permissions for the same role
-);
-
 -- para cada subject que roles ele pode pedir
 -- TABLE: Subject Roles (Mapping Subjects to Roles)
 CREATE TABLE subject_roles (
@@ -142,8 +129,8 @@ BEGIN
     WHERE roles.name = 'Manager' AND roles.organization_id = NEW.id;
 
     -- Assign all permissions to the 'Manager' role
-    INSERT INTO role_permissions (role_id, permission_id)
-    SELECT roles.id, permissions.id
+    INSERT INTO organization_acls (organization_id, role_id, permission_id)
+    SELECT NEW.id, roles.id, permissions.id
     FROM roles, permissions
     WHERE roles.name = 'Manager' AND roles.organization_id = NEW.id;
 END;

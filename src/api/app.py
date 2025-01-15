@@ -12,7 +12,7 @@ import os
 import dotenv
 from flask import Flask, jsonify, request, send_file, g
 
-# laod env variables and generate them if needed
+# load env variables and generate them if needed
 def gen_env_vars():
     def generate_random_string(length=256):
         characters = string.ascii_letters + string.digits + string.punctuation
@@ -181,8 +181,8 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
                     cur.execute(f"""
                         SELECT p.name
                         FROM permissions p 
-                        JOIN role_permissions rp ON rp.permission_id = p.id
-                        JOIN roles r ON r.id = rp.role_id
+                        JOIN organization_acls oa ON oa.permission_id = p.id
+                        JOIN roles r ON r.id = oa.role_id
                         WHERE r.name = ({placeholders}) AND r.organization_id = ?;
                     """, (*session_roles, org))
                     session_permissions = set(row[0] for row in cur.fetchall())
@@ -221,19 +221,6 @@ def verify_permission(required_permissions: List[str], choser=lambda x:0, doc_re
     
     return decorator
 
-@app.route('/jail-house-lock', methods=['GET'])
-def clean_database():
-    
-    for i in os.listdir('./docs_repo/'):
-        os.remove(os.path.join('./docs_repo/', i))
-
-    db = get_db()
-    db.close()
-    os.remove(DATABASE)
-    g.pop('db')
-    with app.app_context():
-        initialize_db()
-    return jsonify({"status": "success"}), 200
 
 # secure comunication setup
 @app.route('/get-parameters', methods=['GET'])
@@ -1043,12 +1030,13 @@ def add_permission():
                 raise Exception("This permission is related to Documents")
 
             cur.execute("""
-                INSERT INTO role_permissions (role_id, permission_id)
+                INSERT INTO organization_acls (organization_id, role_id, permission_id)
                 VALUES (
+                    ?,
                     (SELECT id FROM roles WHERE name = ? AND organization_id = ?),
                     (SELECT id FROM permissions WHERE name = ?)
                 );
-            """, (role, org_id, target))
+            """, (org_id, role, org_id, target))
 
             # in case of adding a Manager
             if role == 'Manager':
@@ -1098,11 +1086,12 @@ def remove_permission():
 
         else:
             cur.execute("""
-                DELETE FROM role_permissions
+                DELETE FROM organization_acls
                 WHERE 
+                    organization_id = ? AND
                     role_id = (SELECT id FROM roles WHERE name = ? AND organization_id = ?) AND 
                     permission_id = (SELECT id FROM permissions WHERE name = ?);
-            """, (role, org_id, target))
+            """, (org_id, role, org_id, target))
 
             # in case of removing a Manager
             if role == 'Manager':
@@ -1263,8 +1252,8 @@ def list_role_permissions():
             SELECT
                 p.name
             FROM permissions p
-            JOIN role_permissions rp ON rp.permission_id = p.id
-            JOIN roles r ON r.id = rp.role_id
+            JOIN organization_acls oa ON oa.permission_id = p.id
+            JOIN roles r ON r.id = oa.role_id
             WHERE 
                 r.name = ? AND
                 r.organization_id = ?;
@@ -1304,8 +1293,8 @@ def list_permission_roles():
                 r.name, 
                 r.status
             FROM roles r
-            JOIN role_permissions rp ON rp.role_id = r.id
-            JOIN permissions p ON p.id = rp.permission_id
+            JOIN organization_acls oa ON oa.role_id = r.id
+            JOIN permissions p ON p.id = oa.permission_id
             WHERE 
                 p.name = ? AND
                 r.organization_id = ?;
