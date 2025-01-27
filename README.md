@@ -1,5 +1,7 @@
 # Document Repository
 
+Repository service for documents for organizations that can be securely shared among several people.
+
 **Authors:**
 - [Alexandre Regalado](https://github.com/Alxit0)
 - [Bernardo Borges](https://github.com/BennyTime)
